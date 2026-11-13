@@ -13,11 +13,18 @@ const DEFAULT_PACKAGES = [
   { robux: 50, price: 8000 },
   { robux: 60, price: 9500 },
   { robux: 70, price: 11000 },
-  { robux: 80, price: 12000 },
+  { robux: 80, price: 12500 },
   { robux: 90, price: 13500 },
-  { robux: 100, price: 15000 },
-  { robux: 200, price: 30000 },
+  { robux: 100, price: 15500, badge: 'FAVORIT' },
+  { robux: 200, price: 31000 },
+  { robux: 300, price: 46500 },
+  { robux: 400, price: 62000 },
   { robux: 500, price: 77500 },
+  { robux: 1000, price: 155000, badge: 'GROSIR' },
+  { robux: 2000, price: 310000 },
+  { robux: 3000, price: 465000 },
+  { robux: 4000, price: 620000 },
+  { robux: 5000, price: 750000, badge: 'SULTAN' },
 ];
 
 export default function StorePage() {
@@ -60,7 +67,7 @@ export default function StorePage() {
         if (data.is_open !== undefined) setIsOpen(data.is_open);
         if (data.prices && Object.keys(data.prices).length > 0) {
           const updated = DEFAULT_PACKAGES.map(pkg => ({
-            robux: pkg.robux,
+            ...pkg,
             price: data.prices[pkg.robux] ? Number(data.prices[pkg.robux]) : pkg.price
           }));
           setPackages(updated);
@@ -79,7 +86,7 @@ export default function StorePage() {
     if (!isOpen) return alert("Maaf, toko sedang tutup sementara.");
     const currentRobuxInCart = cart.reduce((sum, item) => sum + item.robux, 0);
     if (totalStock !== null && totalStock !== "" && currentRobuxInCart + pkg.robux > Number(totalStock)) {
-      return alert(`Stok Robux tidak mencukupi (tersedia ${totalStock} R$).`);
+      return alert(`Stok Robux tidak mencukupi (tersedia ${Number(totalStock).toLocaleString('id-ID')} R$).`);
     }
     setCart([...cart, { ...pkg, cartId: Date.now() + Math.random() }]);
   };
@@ -120,7 +127,7 @@ export default function StorePage() {
       }
 
       const detailItemsText = cart
-        .map(item => `• ${item.robux} Robux - Rp ${item.price.toLocaleString('id-ID')}`)
+        .map(item => `• ${item.robux.toLocaleString('id-ID')} Robux - Rp ${item.price.toLocaleString('id-ID')}`)
         .join('\n');
 
       const waMessage = 
@@ -180,10 +187,9 @@ export default function StorePage() {
       className="min-h-screen text-white font-sans bg-cover bg-center bg-fixed pb-28 relative"
       style={{ backgroundImage: "url('/background.jpeg')" }}
     >
-      {/* Lapisan gelap tanpa backdrop-filter agar elemen fixed selalu melayang di layar */}
       <div className="min-h-screen bg-[#0b0f19]/90">
         {/* HEADER */}
-        <header className="max-w-5xl mx-auto px-4 py-5 flex flex-wrap justify-between items-center gap-4 border-b border-gray-800/80">
+        <header className="max-w-6xl mx-auto px-4 py-5 flex flex-wrap justify-between items-center gap-4 border-b border-gray-800/80">
           <div className="flex items-center gap-3">
             <img src="/logo.jpeg" alt="DenzJr Store" className="w-11 h-11 rounded-xl object-cover border border-orange-500/50 shadow-md" />
             <div>
@@ -209,7 +215,7 @@ export default function StorePage() {
           </div>
         </header>
 
-        <main className="max-w-5xl mx-auto px-4 pt-6">
+        <main className="max-w-6xl mx-auto px-4 pt-6">
           {/* HERO BANNER */}
           <div className="bg-gradient-to-br from-[#121929]/95 via-[#0f1624]/95 to-[#0b1f29]/95 border border-gray-800 rounded-2xl p-6 md:p-10 mb-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
             <div className="max-w-lg">
@@ -281,7 +287,7 @@ export default function StorePage() {
 
             <div className="bg-[#231915] border border-orange-500/30 rounded-xl p-4">
               <p className="text-orange-400 font-bold text-xs mb-1">⚡ Catatan penting</p>
-              <p className="text-gray-300 text-xs">PASTIKAN USERNAME DAN DISPLAYNAME SESUAI HURUS BESAR / KECIL. JIKA TERJADI KESALAHAN, MAKA HAL TERSEBUT DILUAR TANGGUNG JAWAB ADMIN.</p>
+              <p className="text-gray-300 text-xs">Pastikan username sesuai huruf besar/kecil. Jangan logout saat proses top up berlangsung.</p>
             </div>
           </div>
 
@@ -293,7 +299,7 @@ export default function StorePage() {
           ) : (
             <div className="bg-[#0e2923]/90 border border-emerald-500/40 rounded-xl p-3.5 mb-8 text-center">
               <span className="text-emerald-400 font-semibold text-sm">
-                📦 Stok Robux tersedia: <strong className="text-white">{totalStock !== null && totalStock !== "" ? `${totalStock} R$` : 'Tersedia'}</strong>
+                📦 Stok Robux tersedia: <strong className="text-white">{totalStock !== null && totalStock !== "" ? `${Number(totalStock).toLocaleString('id-ID')} R$` : 'Tersedia'}</strong>
               </span>
             </div>
           )}
@@ -307,23 +313,33 @@ export default function StorePage() {
             <p className="text-xs text-gray-400">Harga transparan • Tanpa biaya tersembunyi</p>
           </div>
 
-          {/* GRID NOMINAL ROBUX */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-14">
+          {/* GRID NOMINAL ROBUX (5 KOLOM & BADGE FAVORIT/GROSIR/SULTAN) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-14">
             {packages.map((pkg) => (
-              <div key={pkg.robux} className="bg-[#121724]/95 border border-gray-800 hover:border-orange-500/50 rounded-2xl p-5 transition flex flex-col justify-between">
+              <div 
+                key={pkg.robux} 
+                className={`bg-[#121724]/95 border rounded-2xl p-4 transition flex flex-col justify-between ${pkg.badge ? 'border-orange-500/40' : 'border-gray-800 hover:border-orange-500/50'}`}
+              >
                 <div>
-                  <span className="inline-block bg-[#1d2436] text-gray-300 text-xs font-bold px-2.5 py-1 rounded-md mb-3">R$</span>
-                  <div className="text-xl font-extrabold text-white">
-                    {pkg.robux} <span className="text-sm font-normal text-gray-400">Robux</span>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="inline-block bg-[#1d2436] text-gray-300 text-[11px] font-bold px-2 py-0.5 rounded-md">R$</span>
+                    {pkg.badge && (
+                      <span className="bg-orange-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md tracking-wider uppercase">
+                        {pkg.badge}
+                      </span>
+                    )}
                   </div>
-                  <div className="text-lg font-bold text-gray-200 mt-1 mb-4">
+                  <div className="text-lg font-extrabold text-white">
+                    {pkg.robux.toLocaleString('id-ID')} <span className="text-xs font-normal text-gray-400">Robux</span>
+                  </div>
+                  <div className="text-base font-bold text-gray-200 mt-1 mb-4">
                     Rp {pkg.price.toLocaleString('id-ID')}
                   </div>
                 </div>
                 <button
                   disabled={!isOpen || (totalStock !== null && totalStock !== "" && Number(totalStock) < pkg.robux)}
                   onClick={() => addToCart(pkg)}
-                  className="w-full bg-[#1a2234] hover:bg-orange-500 hover:text-white disabled:opacity-40 disabled:hover:bg-[#1a2234] text-gray-200 font-semibold text-sm py-2.5 rounded-xl transition"
+                  className="w-full bg-[#1a2234] hover:bg-orange-500 hover:text-white disabled:opacity-40 disabled:hover:bg-[#1a2234] text-gray-200 font-semibold text-xs py-2.5 rounded-xl transition"
                 >
                   + Keranjang &gt;
                 </button>
@@ -410,14 +426,14 @@ export default function StorePage() {
 
       {/* FLOATING CART BAR (SELALU MELAYANG DI LAYAR) */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#0d121d]/95 border-t border-gray-800 shadow-[0_-10px_30px_rgba(0,0,0,0.6)] z-40">
-        <div className="max-w-5xl mx-auto px-4 py-3.5 flex justify-between items-center">
+        <div className="max-w-6xl mx-auto px-4 py-3.5 flex justify-between items-center">
           <div>
             <p className="text-xs text-gray-400">Keranjang kamu</p>
             {cart.length === 0 ? (
               <p className="text-sm font-bold text-orange-500">Masih kosong</p>
             ) : (
               <p className="text-sm font-bold text-white">
-                {totalRobux} Robux • <span className="text-orange-400">Rp {totalPrice.toLocaleString('id-ID')}</span>
+                {totalRobux.toLocaleString('id-ID')} Robux • <span className="text-orange-400">Rp {totalPrice.toLocaleString('id-ID')}</span>
               </p>
             )}
           </div>
@@ -448,7 +464,7 @@ export default function StorePage() {
                   {cart.map((item) => (
                     <div key={item.cartId} className="bg-[#192032] border border-gray-800 rounded-xl p-3 flex justify-between items-center">
                       <div>
-                        <p className="font-bold text-sm text-orange-400">{item.robux} Robux</p>
+                        <p className="font-bold text-sm text-orange-400">{item.robux.toLocaleString('id-ID')} Robux</p>
                         <p className="text-xs text-gray-300">Rp {item.price.toLocaleString('id-ID')}</p>
                       </div>
                       <button onClick={() => removeFromCart(item.cartId)} className="text-red-400 hover:text-red-300 text-sm px-2">🗑️</button>
