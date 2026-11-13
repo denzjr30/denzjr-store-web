@@ -11,6 +11,7 @@ const DEFAULT_PRICES = {
   200: 31000, 300: 46500, 400: 62000, 500: 77500, 1000: 155000,
   2000: 310000, 3000: 465000, 4000: 620000, 5000: 750000
 };
+
 export default function AdminDashboard() {
   const [pin, setPin] = useState('');
   const [token, setToken] = useState(localStorage.getItem('admin_token') || '');
@@ -37,8 +38,8 @@ export default function AdminDashboard() {
     e.preventDefault();
     setAuthError('');
     try {
-      const res = await axios.post(`${API_BASE_URL}/api/admin/login`, { admin_pin: pin });
-      const jwt = res.data.token || res.data.access_token;
+      const res = await axios.post(`${API_BASE_URL}/api/admin/login`, { pin });
+      const jwt = typeof res.data === 'string' ? res.data : (res.data.token || res.data.access_token || pin);
       setToken(jwt);
       localStorage.setItem('admin_token', jwt);
     } catch (err) {
@@ -46,62 +47,121 @@ export default function AdminDashboard() {
     }
   };
 
+  const getAuthHeaders = () => ({
+    Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`
+  });
+
   const fetchAllAdminData = async () => {
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      const [ordRes, setRes, revRes] = await Promise.allSettled([
+      const headers = getAuthHeaders();
+      const [ordRes, shopRes, revRes] = await Promise.allSettled([
         axios.get(`${API_BASE_URL}/api/admin/orders`, { headers }),
-        axios.get(`${API_BASE_URL}/api/settings`),
+        axios.get(`${API_BASE_URL}/api/shop/stock`),
         axios.get(`${API_BASE_URL}/api/reviews`)
       ]);
 
-      if (ordRes.status === 'fulfilled') setOrders(ordRes.value.data || []);
-      if (revRes.status === 'fulfilled') setReviews(revRes.value.data || []);
-      if (setRes.status === 'fulfilled' && setRes.value.data) {
-        const s = setRes.value.data;
-        setStock(s.stock !== null && s.stock !== undefined ? String(s.stock) : '');
-        setIsOpen(s.is_open !== undefined ? s.is_open : true);
-        if (s.prices) setPrices({ ...DEFAULT_PRICES, ...s.prices });
+      if (ordRes.status === 'fulfilled') {
+        setOrders(Array.isArray(ordRes.value.data) ? ordRes.value.data : []);
+      } else if (ordRes.reason?.response?.status === 401 || ordRes.reason?.response?.status === 403) {
+        setToken('');
+        localStorage.removeItem('admin_token');
+        return;
+      }
+
+      if (revRes.status === 'fulfilled') {
+        setReviews(Array.isArray(revRes.value.data) ? revRes.value.data : []);
+      }
+
+      if (shopRes.status === 'fulfilled' && shopRes.value.data) {
+        const s = shopRes.value.data;
+        const rawStock = s.total_stock ?? s.stock;
+        setStock(rawStock !== null && rawStock !== undefined ? String(rawStock) : '');
+        setIsOpen(s.closed !== undefined ? !s.closed : (s.is_open !== undefined ? s.is_open : true));
+
+        if (Array.isArray(s.packages)) {
+          const mapped = { ...DEFAULT_PRICES };
+          s.packages.forEach(p => {
+            if (p.robux && p.price !== undefined) mapped[p.robux] = Number(p.price);
+          });
+          setPrices(mapped);
+        } else if (s.prices && typeof s.prices === 'object') {
+          setPrices({ ...DEFAULT_PRICES, ...s.prices });
+        }
       }
     } catch (err) {
-      setToken('');
-      localStorage.removeItem('admin_token');
+      console.error('Gagal memuat data admin:', err);
     }
   };
 
-  const handleSaveSettings = async (customOpenState = isOpen) => {
+  const handleToggleShopStatus = async () => {
+    const nextOpenState = !isOpen;
+    try {
+      const headers = getAuthHeaders();
+      await axios.put(
+        `${API_BASE_URL}/api/admin/shop-status`,
+        { closed: !nextOpenState },
+        { headers }
+      );
+      setIsOpen(nextOpenState);
+      alert(nextOpenState ? 'Status toko diubah menjadi BUKA!' : 'Status toko diubah menjadi TUTUP sementara!');
+    } catch (err) {
+      alert('Gagal mengubah status buka/tutup toko.');
+    }
+  };
+
+  const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      await axios.put(`${API_BASE_URL}/api/admin/settings`, {
-        stock: stock === '' ? null : Number(stock),
-        is_open: customOpenState,
-        prices
-      }, { headers });
-      setIsOpen(customOpenState);
-      alert('Pengaturan stok, status toko & harga berhasil disimpan!');
+      const headers = getAuthHeaders();
+      const stockValue = stock === '' ? 0 : Number(stock);
+
+      await axios.put(
+        `${API_BASE_URL}/api/admin/total-stock`,
+        { robux: 0, stock: stockValue },
+        { headers }
+      );
+
+      await Promise.all(
+        NOMINAL_LIST.map((nom) =>
+          axios.put(
+            `${API_BASE_URL}/api/admin/price`,
+            { robux: Number(nom), price: Number(prices[nom] || DEFAULT_PRICES[nom]) },
+            { headers }
+          )
+        )
+      );
+
+      alert('Perubahan stok & seluruh harga berhasil disimpan!');
+      fetchAllAdminData();
     } catch (err) {
-      alert('Gagal menyimpan pengaturan toko.');
+      alert('Gagal menyimpan perubahan stok atau harga.');
     } finally {
       setSavingSettings(false);
     }
   };
 
-  const handleStatusChange = async (orderId, newStatus) => {
+  const handleStatusChange = async (orderNumber, newStatus) => {
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      await axios.put(`${API_BASE_URL}/api/admin/orders/${orderId}`, { status: newStatus }, { headers });
+      const headers = getAuthHeaders();
+      await axios.patch(
+        `${API_BASE_URL}/api/admin/orders/${encodeURIComponent(orderNumber)}`,
+        { status: newStatus },
+        { headers }
+      );
       fetchAllAdminData();
     } catch (err) {
       alert('Gagal mengubah status pesanan.');
     }
   };
 
-  const handleDeleteOrder = async (orderId) => {
-    if (!window.confirm('Hapus pesanan ini secara permanen?')) return;
+  const handleDeleteOrder = async (orderNumber) => {
+    if (!window.confirm(`Hapus pesanan ${orderNumber} secara permanen?`)) return;
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      await axios.delete(`${API_BASE_URL}/api/admin/orders/${orderId}`, { headers });
+      const headers = getAuthHeaders();
+      await axios.delete(
+        `${API_BASE_URL}/api/admin/orders/${encodeURIComponent(orderNumber)}`,
+        { headers }
+      );
       fetchAllAdminData();
     } catch (err) {
       alert('Gagal menghapus pesanan.');
@@ -111,7 +171,7 @@ export default function AdminDashboard() {
   const handleDeleteReview = async (reviewId) => {
     if (!window.confirm('Hapus ulasan ini?')) return;
     try {
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = getAuthHeaders();
       await axios.delete(`${API_BASE_URL}/api/admin/reviews/${reviewId}`, { headers });
       fetchAllAdminData();
     } catch (err) {
@@ -213,7 +273,7 @@ export default function AdminDashboard() {
               <h2 className="text-xl font-extrabold">Atur stok & toko</h2>
             </div>
             <button
-              onClick={() => handleSaveSettings(!isOpen)}
+              onClick={handleToggleShopStatus}
               className={`px-4 py-2 rounded-xl text-sm font-bold border transition ${isOpen ? 'bg-[#0e2923] border-emerald-500/40 text-emerald-400' : 'bg-red-950 border-red-500/40 text-red-400'}`}
             >
               {isOpen ? '🟢 Toko BUKA — tutup sementara' : '🔴 Toko TUTUP — buka kembali'}
@@ -229,7 +289,7 @@ export default function AdminDashboard() {
               placeholder="Contoh: 510"
               className="w-full max-w-xs bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-white font-bold focus:border-orange-500 outline-none"
             />
-            <p className="text-xs text-gray-500 mt-1.5">Kosongkan = stok tidak dibatasi. Angka ini tampil di website publik dan berkurang otomatis saat pesanan selesai.</p>
+            <p className="text-xs text-gray-500 mt-1.5">Angka ini tampil di website publik dan berkurang otomatis saat pesanan selesai.</p>
           </div>
 
           <div className="border-t border-gray-800 pt-5">
@@ -239,7 +299,7 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
               {NOMINAL_LIST.map((nom) => (
                 <div key={nom}>
-                  <label className="block text-xs font-bold text-cyan-400 mb-1">{nom} R$</label>
+                  <label className="block text-xs font-bold text-cyan-400 mb-1">{nom.toLocaleString('id-ID')} R$</label>
                   <input
                     type="number"
                     value={prices[nom] || ''}
@@ -251,7 +311,7 @@ export default function AdminDashboard() {
             </div>
 
             <button
-              onClick={() => handleSaveSettings(isOpen)}
+              onClick={handleSaveSettings}
               disabled={savingSettings}
               className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-6 py-3 rounded-xl text-sm transition"
             >
@@ -291,28 +351,32 @@ export default function AdminDashboard() {
             </div>
           ) : (
             filteredOrders.map((ord) => {
-              const id = ord.id || ord._id;
-              const orderCode = ord.order_number || ord.tracking_code;
+              const orderCode = ord.order_number || ord.tracking_code || ord.id || ord._id;
               const cleanPhone = (ord.whatsapp || '').replace(/^0/, '62').replace(/[^0-9]/g, '');
               const waUpdateMsg = encodeURIComponent(
-                `Halo *${ord.buyer_name}*, update pesanan DenzJr Store kamu:\n` +
+                `Halo *${ord.buyer_name || ord.roblox_username}*, update pesanan DenzJr Store kamu:\n` +
                 `• No. Order: *${orderCode}*\n` +
                 `• Username Roblox: *${ord.roblox_username}*\n` +
                 `• Status Terbaru: *${ord.status}*\n\nTerima kasih sudah order!`
               );
 
               return (
-                <div key={id} className="bg-[#121724] border border-gray-800 rounded-2xl p-5 space-y-4">
+                <div key={orderCode} className="bg-[#121724] border border-gray-800 rounded-2xl p-5 space-y-4">
                   <div className="flex flex-wrap justify-between items-start gap-3">
                     <div>
                       <h3 className="text-lg font-extrabold text-orange-500">{orderCode}</h3>
-                      <p className="text-xs text-gray-400">{ord.roblox_username} • {ord.buyer_name} ({ord.whatsapp})</p>
+                      <p className="text-xs text-gray-400">{ord.roblox_username} • {ord.buyer_name || '-'} ({ord.whatsapp || '-'})</p>
                       <div className="mt-2 flex flex-wrap gap-2 items-center">
                         <span className="bg-[#1a2234] text-xs px-2.5 py-1 rounded-lg text-gray-300">
                           {ord.robux_amount} Robux • Rp {(ord.total_price || 0).toLocaleString('id-ID')}
                         </span>
                         {ord.payment_proof_url && (
-                          <a href={ord.payment_proof_url} target="_blank" rel="noreferrer" className="text-xs text-cyan-400 underline">
+                          <a
+                            href={ord.payment_proof_url.startsWith('/') ? `${API_BASE_URL}${ord.payment_proof_url}` : ord.payment_proof_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-cyan-400 underline"
+                          >
                             Lihat Bukti TF ↗
                           </a>
                         )}
@@ -322,7 +386,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-2">
                       <select
                         value={ord.status}
-                        onChange={e => handleStatusChange(id, e.target.value)}
+                        onChange={e => handleStatusChange(orderCode, e.target.value)}
                         className="bg-[#0b0f19] border border-gray-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-orange-500"
                       >
                         <option value="Menunggu konfirmasi">Menunggu konfirmasi</option>
@@ -332,7 +396,7 @@ export default function AdminDashboard() {
                       </select>
 
                       <button
-                        onClick={() => handleDeleteOrder(id)}
+                        onClick={() => handleDeleteOrder(orderCode)}
                         className="bg-red-950/60 hover:bg-red-900 border border-red-500/40 text-red-400 p-2 rounded-xl"
                         title="Hapus Pesanan"
                       >
