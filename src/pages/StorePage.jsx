@@ -56,16 +56,28 @@ export default function StorePage() {
 
   const fetchStoreData = async () => {
     try {
-      const [settingsRes, reviewsRes] = await Promise.allSettled([
-        axios.get(`${API_BASE_URL}/api/settings`),
+      const [shopRes, reviewsRes] = await Promise.allSettled([
+        axios.get(`${API_BASE_URL}/api/shop/stock`),
         axios.get(`${API_BASE_URL}/api/reviews`)
       ]);
 
-      if (settingsRes.status === 'fulfilled' && settingsRes.value.data) {
-        const data = settingsRes.value.data;
-        if (data.stock !== undefined) setTotalStock(data.stock);
-        if (data.is_open !== undefined) setIsOpen(data.is_open);
-        if (data.prices && Object.keys(data.prices).length > 0) {
+      if (shopRes.status === 'fulfilled' && shopRes.value.data) {
+        const data = shopRes.value.data;
+        const rawStock = data.total_stock ?? data.stock;
+        if (rawStock !== undefined) setTotalStock(rawStock);
+        if (data.closed !== undefined) {
+          setIsOpen(!data.closed);
+        } else if (data.is_open !== undefined) {
+          setIsOpen(data.is_open);
+        }
+
+        if (Array.isArray(data.packages) && data.packages.length > 0) {
+          const updated = DEFAULT_PACKAGES.map(pkg => {
+            const found = data.packages.find(p => Number(p.robux) === pkg.robux);
+            return found && found.price !== undefined ? { ...pkg, price: Number(found.price) } : pkg;
+          });
+          setPackages(updated);
+        } else if (data.prices && Object.keys(data.prices).length > 0) {
           const updated = DEFAULT_PACKAGES.map(pkg => ({
             ...pkg,
             price: data.prices[pkg.robux] ? Number(data.prices[pkg.robux]) : pkg.price
