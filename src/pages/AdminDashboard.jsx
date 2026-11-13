@@ -3,14 +3,14 @@ import axios from 'axios';
 import { API_BASE_URL } from '../config';
 import { Link } from 'react-router-dom';
 
-const NOMINAL_LIST = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 500];
+const NOMINAL_LIST = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000, 4000, 5000];
 
 const DEFAULT_PRICES = {
-  10: 2000, 20: 3500, 30: 5000, 40: 6500,
-  50: 8000, 60: 9500, 70: 11000, 80: 12000,
-  90: 13500, 100: 15000, 200: 30000, 500: 77500
+  10: 2000, 20: 3500, 30: 5000, 40: 6500, 50: 8000,
+  60: 9500, 70: 11000, 80: 12500, 90: 13500, 100: 15500,
+  200: 31000, 300: 46500, 400: 62000, 500: 77500, 1000: 155000,
+  2000: 310000, 3000: 465000, 4000: 620000, 5000: 750000
 };
-
 export default function AdminDashboard() {
   const [pin, setPin] = useState('');
   const [token, setToken] = useState(localStorage.getItem('admin_token') || '');
