@@ -23,6 +23,7 @@ export default function AdminDashboard() {
   const [isOpen, setIsOpen] = useState(true);
   const [prices, setPrices] = useState(DEFAULT_PRICES);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [previewProof, setPreviewProof] = useState(null);
 
   // Filter & Sort Pesanan
   const [statusFilter, setStatusFilter] = useState('Semua');
@@ -74,17 +75,11 @@ export default function AdminDashboard() {
 
       if (shopRes.status === 'fulfilled' && shopRes.value.data) {
         const s = shopRes.value.data;
-        const rawStock = s.total_stock ?? s.stock;
+        const rawStock = s.total_stock;
         setStock(rawStock !== null && rawStock !== undefined ? String(rawStock) : '');
         setIsOpen(s.closed !== undefined ? !s.closed : (s.is_open !== undefined ? s.is_open : true));
 
-        if (Array.isArray(s.packages)) {
-          const mapped = { ...DEFAULT_PRICES };
-          s.packages.forEach(p => {
-            if (p.robux && p.price !== undefined) mapped[p.robux] = Number(p.price);
-          });
-          setPrices(mapped);
-        } else if (s.prices && typeof s.prices === 'object') {
+        if (s.prices && typeof s.prices === 'object') {
           setPrices({ ...DEFAULT_PRICES, ...s.prices });
         }
       }
@@ -179,12 +174,12 @@ export default function AdminDashboard() {
     }
   };
 
-  // Hitung Statistik
+  // Hitung Statistik (Mendukung field 'total' maupun 'total_price')
   const totalOrders = orders.length;
-  const totalOrderValue = orders.reduce((sum, o) => sum + (Number(o.total_price) || 0), 0);
+  const totalOrderValue = orders.reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
   const completedRevenue = orders
     .filter(o => o.status === 'Selesai')
-    .reduce((sum, o) => sum + (Number(o.total_price) || 0), 0);
+    .reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
 
   const countByStatus = (st) => orders.filter(o => o.status === st).length;
 
@@ -289,7 +284,7 @@ export default function AdminDashboard() {
               placeholder="Contoh: 510"
               className="w-full max-w-xs bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-white font-bold focus:border-orange-500 outline-none"
             />
-            <p className="text-xs text-gray-500 mt-1.5">Angka ini tampil di website publik dan berkurang otomatis saat pesanan selesai.</p>
+            <p className="text-xs text-gray-500 mt-1.5">Kosongkan = stok tidak dibatasi. Angka ini tampil di website publik dan berkurang otomatis saat pesanan selesai.</p>
           </div>
 
           <div className="border-t border-gray-800 pt-5">
@@ -352,11 +347,22 @@ export default function AdminDashboard() {
           ) : (
             filteredOrders.map((ord) => {
               const orderCode = ord.order_number || ord.tracking_code || ord.id || ord._id;
-              const cleanPhone = (ord.whatsapp || '').replace(/^0/, '62').replace(/[^0-9]/g, '');
+              const uName = ord.username || ord.roblox_username || '-';
+              const dName = ord.display_name || ord.buyer_name || '-';
+              const bPhone = ord.buyer_phone || ord.whatsapp || '';
+              const orderTotal = Number(ord.total ?? ord.total_price ?? 0);
+              const rawProof = ord.proof_url || ord.payment_proof_url || '';
+              const proofSrc = rawProof.startsWith('/') ? `${API_BASE_URL}${rawProof}` : rawProof;
+
+              const itemsSummary = Array.isArray(ord.items) && ord.items.length > 0
+                ? ord.items.map(it => `${Number(it.robux || 0).toLocaleString('id-ID')} R$ (x${it.qty || 1})`).join(', ')
+                : `${ord.robux_amount || 0} Robux`;
+
+              const cleanPhone = bPhone.replace(/^0/, '62').replace(/[^0-9]/g, '');
               const waUpdateMsg = encodeURIComponent(
-                `Halo *${ord.buyer_name || ord.roblox_username}*, update pesanan DenzJr Store kamu:\n` +
+                `Halo *${dName !== '-' ? dName : uName}*, update pesanan DenzJr Store kamu:\n` +
                 `• No. Order: *${orderCode}*\n` +
-                `• Username Roblox: *${ord.roblox_username}*\n` +
+                `• Username Roblox: *${uName}*\n` +
                 `• Status Terbaru: *${ord.status}*\n\nTerima kasih sudah order!`
               );
 
@@ -365,20 +371,19 @@ export default function AdminDashboard() {
                   <div className="flex flex-wrap justify-between items-start gap-3">
                     <div>
                       <h3 className="text-lg font-extrabold text-orange-500">{orderCode}</h3>
-                      <p className="text-xs text-gray-400">{ord.roblox_username} • {ord.buyer_name || '-'} ({ord.whatsapp || '-'})</p>
+                      <p className="text-xs text-gray-400">{uName} • {dName} ({bPhone || '-'})</p>
                       <div className="mt-2 flex flex-wrap gap-2 items-center">
                         <span className="bg-[#1a2234] text-xs px-2.5 py-1 rounded-lg text-gray-300">
-                          {ord.robux_amount} Robux • Rp {(ord.total_price || 0).toLocaleString('id-ID')}
+                          {itemsSummary} • Rp {orderTotal.toLocaleString('id-ID')}
                         </span>
-                        {ord.payment_proof_url && (
-                          <a
-                            href={ord.payment_proof_url.startsWith('/') ? `${API_BASE_URL}${ord.payment_proof_url}` : ord.payment_proof_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-cyan-400 underline"
+                        {proofSrc && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewProof({ src: proofSrc, orderCode, uName })}
+                            className="text-xs text-cyan-400 underline hover:text-cyan-300"
                           >
                             Lihat Bukti TF ↗
-                          </a>
+                          </button>
                         )}
                       </div>
                     </div>
@@ -407,7 +412,7 @@ export default function AdminDashboard() {
 
                   <div className="flex justify-between items-center border-y border-gray-800 py-3">
                     <span className="text-xs text-gray-400">Total</span>
-                    <span className="text-xl font-extrabold text-orange-500">Rp {(ord.total_price || 0).toLocaleString('id-ID')}</span>
+                    <span className="text-xl font-extrabold text-orange-500">Rp {orderTotal.toLocaleString('id-ID')}</span>
                   </div>
 
                   {cleanPhone && (
@@ -443,23 +448,4 @@ export default function AdminDashboard() {
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-bold text-sm">{rev.name}</span>
                         <span className="text-amber-400 text-xs">{'★'.repeat(rev.rating || 5)}</span>
-                        {rev.order_number && <span className="text-xs text-gray-500">({rev.order_number})</span>}
-                      </div>
-                      <p className="text-sm text-gray-300">{rev.comment}</p>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteReview(revId)}
-                      className="text-red-400 hover:text-red-300 text-xs bg-red-950/60 border border-red-500/30 px-3 py-1.5 rounded-lg"
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      </div>
-    </div>
-  );
-}
+                        {rev.order_number && <span className="text-xs text
