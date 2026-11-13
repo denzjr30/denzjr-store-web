@@ -113,11 +113,11 @@ export default function AdminDashboard() {
     setSavingSettings(true);
     try {
       const headers = getAuthHeaders();
-      const stockValue = stock === '' ? 0 : Number(stock);
+      const stockValue = stock === '' ? null : Number(stock);
 
       await axios.put(
         `${API_BASE_URL}/api/admin/total-stock`,
-        { robux: 0, stock: stockValue },
+        { robux: 0, stock: stockValue, total_stock: stockValue },
         { headers }
       );
 
@@ -134,7 +134,7 @@ export default function AdminDashboard() {
       alert('Perubahan stok & seluruh harga berhasil disimpan!');
       fetchAllAdminData();
     } catch (err) {
-      alert('Gagal menyimpan perubahan stok atau harga.');
+      alert(`Gagal menyimpan: ${err.response?.data?.detail || err.message}`);
     } finally {
       setSavingSettings(false);
     }
