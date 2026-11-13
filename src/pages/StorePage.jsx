@@ -28,7 +28,7 @@ export default function StorePage() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [showQris, setShowQris] = useState(true);
 
-  // Form Checkout
+  // Data Akun Roblox (Bagian 01 & Checkout)
   const [robloxUsername, setRobloxUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -94,7 +94,7 @@ export default function StorePage() {
   const handleCheckoutSubmit = async (e) => {
     e.preventDefault();
     if (cart.length === 0) return alert("Keranjang masih kosong!");
-    if (!robloxUsername.trim()) return alert("Masukkan username Roblox kamu!");
+    if (!robloxUsername.trim()) return alert("Masukkan username Roblox kamu terlebih dahulu!");
     if (!paymentProof) return alert("Pilih gambar bukti transfer terlebih dahulu!");
 
     setSubmitting(true);
@@ -177,12 +177,13 @@ export default function StorePage() {
 
   return (
     <div 
-      className="min-h-screen text-white font-sans bg-cover bg-center bg-fixed pb-28"
+      className="min-h-screen text-white font-sans bg-cover bg-center bg-fixed pb-28 relative"
       style={{ backgroundImage: "url('/background.jpeg')" }}
     >
-      <div className="min-h-screen bg-[#0b0f19]/90 backdrop-blur-[2px]">
+      {/* Lapisan gelap tanpa backdrop-filter agar elemen fixed selalu melayang di layar */}
+      <div className="min-h-screen bg-[#0b0f19]/90">
         {/* HEADER */}
-        <header className="max-w-5xl mx-auto px-4 py-5 flex flex-wrap justify-between items-center gap-4 border-b border-gray-800">
+        <header className="max-w-5xl mx-auto px-4 py-5 flex flex-wrap justify-between items-center gap-4 border-b border-gray-800/80">
           <div className="flex items-center gap-3">
             <img src="/logo.jpeg" alt="DenzJr Store" className="w-11 h-11 rounded-xl object-cover border border-orange-500/50 shadow-md" />
             <div>
@@ -209,10 +210,79 @@ export default function StorePage() {
         </header>
 
         <main className="max-w-5xl mx-auto px-4 pt-6">
-          {/* CATATAN PENTING */}
-          <div className="bg-[#231915]/90 border border-orange-500/30 rounded-xl p-4 mb-5">
-            <p className="text-orange-400 font-bold text-sm mb-1">⚡ Catatan penting</p>
-            <p className="text-gray-300 text-sm">Pastikan username sesuai huruf besar/kecil. Jangan logout saat proses top up berlangsung.</p>
+          {/* HERO BANNER */}
+          <div className="bg-gradient-to-br from-[#121929]/95 via-[#0f1624]/95 to-[#0b1f29]/95 border border-gray-800 rounded-2xl p-6 md:p-10 mb-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+            <div className="max-w-lg">
+              <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase mb-2">✨ Top Up Robux Aman & Cepat</p>
+              <h2 className="text-3xl md:text-4xl font-extrabold leading-tight mb-3">
+                Level up your <span className="text-orange-500">Roblox world.</span>
+              </h2>
+              <p className="text-gray-300 text-sm mb-5 leading-relaxed">
+                Isi username, pilih nominal Robux, dan biarkan kami mengurus sisanya. Simple, cepat, dan terpercaya.
+              </p>
+              <div className="flex items-center gap-5 text-xs font-semibold text-gray-300">
+                <span className="flex items-center gap-1.5 text-orange-400">⚡ <span className="text-gray-300">Proses cepat</span></span>
+                <span className="flex items-center gap-1.5 text-emerald-400">🛡️ <span className="text-gray-300">100% aman</span></span>
+              </div>
+            </div>
+
+            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full border border-cyan-500/30 bg-[#0d1422] flex items-center justify-center relative shadow-[0_0_40px_rgba(6,182,212,0.15)]">
+              <div className="w-24 h-24 rounded-full border border-orange-500/30 flex items-center justify-center">
+                <span className="text-3xl font-black text-white -rotate-12">R$</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 01 DATA AKUN ROBLOX & CATATAN PENTING */}
+          <div className="bg-[#121724]/95 border border-gray-800 rounded-2xl p-6 mb-5">
+            <div className="flex items-center gap-3 mb-5">
+              <span className="w-8 h-8 rounded-full bg-orange-600/20 border border-orange-500/40 text-orange-500 font-bold text-xs flex items-center justify-center">
+                01
+              </span>
+              <div>
+                <h3 className="font-extrabold text-lg">Data akun Roblox</h3>
+                <p className="text-xs text-gray-400">Pastikan username kamu sudah benar ya.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1.5">Username Roblox *</label>
+                <input
+                  type="text"
+                  value={robloxUsername}
+                  onChange={e => setRobloxUsername(e.target.value)}
+                  placeholder="Contoh: RobloxPlayer123"
+                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1.5">Display Name <span className="text-gray-500">(opsional)</span></label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                  placeholder="Contoh: DenzJr"
+                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="mb-5">
+              <label className="block text-xs font-semibold text-gray-300 mb-1.5">No. WhatsApp kamu <span className="text-gray-500">(untuk update status)</span></label>
+              <input
+                type="text"
+                value={whatsapp}
+                onChange={e => setWhatsapp(e.target.value)}
+                placeholder="Contoh: 081234567890"
+                className="w-full md:w-1/2 bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+              />
+            </div>
+
+            <div className="bg-[#231915] border border-orange-500/30 rounded-xl p-4">
+              <p className="text-orange-400 font-bold text-xs mb-1">⚡ Catatan penting</p>
+              <p className="text-gray-300 text-xs">Pastikan username sesuai huruf besar/kecil. Jangan logout saat proses top up berlangsung.</p>
+            </div>
           </div>
 
           {/* STATUS STOK & TOKO */}
@@ -266,7 +336,6 @@ export default function StorePage() {
             <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase mb-1">Kata Mereka</p>
             <h2 className="text-3xl font-extrabold mb-5">Ulasan <span className="text-orange-500">Pembeli</span></h2>
 
-            {/* FORM KIRIM ULASAN */}
             <form onSubmit={handleSendReview} className="bg-[#121724]/95 border border-gray-800 rounded-2xl p-6 mb-6">
               <h3 className="font-bold text-lg mb-3">Beri ulasan</h3>
               <div className="flex gap-2 mb-4">
@@ -317,7 +386,6 @@ export default function StorePage() {
               </button>
             </form>
 
-            {/* DAFTAR ULASAN MASUK */}
             {reviews.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {reviews.map((rev) => (
@@ -338,149 +406,143 @@ export default function StorePage() {
             <span>Top up mudah, main lebih seru.</span>
           </footer>
         </main>
+      </div>
 
-        {/* FLOATING CART BAR DI BAWAH */}
-        <div className="fixed bottom-0 inset-x-0 bg-[#0d121d]/95 border-t border-gray-800 backdrop-blur-md z-40">
-          <div className="max-w-5xl mx-auto px-4 py-3.5 flex justify-between items-center">
-            <div>
-              <p className="text-xs text-gray-400">Keranjang kamu</p>
-              {cart.length === 0 ? (
-                <p className="text-sm font-bold text-orange-500">Masih kosong</p>
-              ) : (
-                <p className="text-sm font-bold text-white">
-                  {totalRobux} Robux • <span className="text-orange-400">Rp {totalPrice.toLocaleString('id-ID')}</span>
-                </p>
-              )}
-            </div>
-            <button
-              onClick={() => setIsCartOpen(true)}
-              className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-lg"
-            >
-              <span>🛒 Buka Keranjang</span>
-              <span className="bg-black/30 px-2 py-0.5 rounded-full text-xs">{cart.length}</span>
-            </button>
+      {/* FLOATING CART BAR (SELALU MELAYANG DI LAYAR) */}
+      <div className="fixed bottom-0 left-0 right-0 bg-[#0d121d]/95 border-t border-gray-800 shadow-[0_-10px_30px_rgba(0,0,0,0.6)] z-40">
+        <div className="max-w-5xl mx-auto px-4 py-3.5 flex justify-between items-center">
+          <div>
+            <p className="text-xs text-gray-400">Keranjang kamu</p>
+            {cart.length === 0 ? (
+              <p className="text-sm font-bold text-orange-500">Masih kosong</p>
+            ) : (
+              <p className="text-sm font-bold text-white">
+                {totalRobux} Robux • <span className="text-orange-400">Rp {totalPrice.toLocaleString('id-ID')}</span>
+              </p>
+            )}
           </div>
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-lg"
+          >
+            <span>🛒 Buka Keranjang</span>
+            <span className="bg-black/30 px-2 py-0.5 rounded-full text-xs">{cart.length}</span>
+          </button>
         </div>
+      </div>
 
-        {/* MODAL / DRAWER KERANJANG & CHECKOUT QRIS */}
-        {isCartOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-[#121724] border border-gray-800 rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto p-5 relative">
-              <div className="flex justify-between items-center border-b border-gray-800 pb-3 mb-4">
-                <h3 className="text-lg font-extrabold">Keranjang & Pembayaran</h3>
-                <button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-white text-xl font-bold">✕</button>
-              </div>
+      {/* MODAL / DRAWER KERANJANG & CHECKOUT QRIS */}
+      {isCartOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-[#121724] border border-gray-800 rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto p-5 relative">
+            <div className="flex justify-between items-center border-b border-gray-800 pb-3 mb-4">
+              <h3 className="text-lg font-extrabold">Keranjang & Pembayaran</h3>
+              <button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-white text-xl font-bold">✕</button>
+            </div>
 
-              {cart.length === 0 ? (
-                <p className="text-center text-gray-400 py-8">Belum ada paket Robux yang dipilih.</p>
-              ) : (
-                <>
-                  {/* DAFTAR ITEM KERANJANG */}
-                  <div className="space-y-2 mb-4">
-                    {cart.map((item) => (
-                      <div key={item.cartId} className="bg-[#192032] border border-gray-800 rounded-xl p-3 flex justify-between items-center">
-                        <div>
-                          <p className="font-bold text-sm text-orange-400">{item.robux} Robux</p>
-                          <p className="text-xs text-gray-300">Rp {item.price.toLocaleString('id-ID')}</p>
-                        </div>
-                        <button onClick={() => removeFromCart(item.cartId)} className="text-red-400 hover:text-red-300 text-sm px-2">🗑️</button>
+            {cart.length === 0 ? (
+              <p className="text-center text-gray-400 py-8">Belum ada paket Robux yang dipilih.</p>
+            ) : (
+              <>
+                <div className="space-y-2 mb-4">
+                  {cart.map((item) => (
+                    <div key={item.cartId} className="bg-[#192032] border border-gray-800 rounded-xl p-3 flex justify-between items-center">
+                      <div>
+                        <p className="font-bold text-sm text-orange-400">{item.robux} Robux</p>
+                        <p className="text-xs text-gray-300">Rp {item.price.toLocaleString('id-ID')}</p>
                       </div>
-                    ))}
-                  </div>
-
-                  {/* TOTAL PEMBAYARAN */}
-                  <div className="flex justify-between items-center py-3 border-y border-gray-800 mb-4">
-                    <span className="font-bold text-gray-300">Total pembayaran</span>
-                    <span className="text-2xl font-extrabold text-orange-500">Rp {totalPrice.toLocaleString('id-ID')}</span>
-                  </div>
-
-                  <div className="bg-[#151e33] border border-blue-500/30 rounded-xl p-3 text-xs text-gray-300 mb-3">
-                    No. Order kamu: <span className="text-cyan-400 font-bold">Dibuat otomatis saat kirim bukti</span>
-                  </div>
-
-                  {/* TOMBOL TOGGLE QRIS */}
-                  <button
-                    type="button"
-                    onClick={() => setShowQris(!showQris)}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl mb-3 transition text-sm"
-                  >
-                    {showQris ? 'Sembunyikan QRIS' : 'Tampilkan QRIS'}
-                  </button>
-
-                  {/* KOTAK QRIS */}
-                  {showQris && (
-                    <div className="bg-[#0b0f19] border border-gray-800 rounded-xl p-4 mb-4 text-center">
-                      <p className="text-cyan-400 font-bold text-sm mb-3">Scan QRIS DenzJr Store</p>
-                      <img src="/qris.jpeg" alt="QRIS DenzJr Store" className="w-56 mx-auto rounded-lg bg-white p-1.5 mb-3" />
-                      <a
-                        href="/qris.jpeg"
-                        download="QRIS-DenzJr-Store.jpeg"
-                        className="block w-full bg-[#1a2234] hover:bg-[#242f47] text-gray-200 text-xs font-bold py-2.5 rounded-lg transition"
-                      >
-                        ⬇ Download QRIS
-                      </a>
+                      <button onClick={() => removeFromCart(item.cartId)} className="text-red-400 hover:text-red-300 text-sm px-2">🗑️</button>
                     </div>
-                  )}
+                  ))}
+                </div>
 
-                  {/* FORM DATA PEMBELI & UPLOAD BUKTI */}
-                  <form onSubmit={handleCheckoutSubmit} className="space-y-3">
+                <div className="flex justify-between items-center py-3 border-y border-gray-800 mb-4">
+                  <span className="font-bold text-gray-300">Total pembayaran</span>
+                  <span className="text-2xl font-extrabold text-orange-500">Rp {totalPrice.toLocaleString('id-ID')}</span>
+                </div>
+
+                <div className="bg-[#151e33] border border-blue-500/30 rounded-xl p-3 text-xs text-gray-300 mb-3">
+                  No. Order kamu: <span className="text-cyan-400 font-bold">Dibuat otomatis saat kirim bukti</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowQris(!showQris)}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl mb-3 transition text-sm"
+                >
+                  {showQris ? 'Sembunyikan QRIS' : 'Tampilkan QRIS'}
+                </button>
+
+                {showQris && (
+                  <div className="bg-[#0b0f19] border border-gray-800 rounded-xl p-4 mb-4 text-center">
+                    <p className="text-cyan-400 font-bold text-sm mb-3">Scan QRIS DenzJr Store</p>
+                    <img src="/qris.jpeg" alt="QRIS DenzJr Store" className="w-56 mx-auto rounded-lg bg-white p-1.5 mb-3" />
+                    <a
+                      href="/qris.jpeg"
+                      download="QRIS-DenzJr-Store.jpeg"
+                      className="block w-full bg-[#1a2234] hover:bg-[#242f47] text-gray-200 text-xs font-bold py-2.5 rounded-lg transition"
+                    >
+                      ⬇ Download QRIS
+                    </a>
+                  </div>
+                )}
+
+                <form onSubmit={handleCheckoutSubmit} className="space-y-3">
+                  <input
+                    type="text"
+                    required
+                    value={robloxUsername}
+                    onChange={e => setRobloxUsername(e.target.value)}
+                    placeholder="Username Roblox *"
+                    className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={e => setDisplayName(e.target.value)}
+                      placeholder="Display Name (opsional)"
+                      className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+                    />
                     <input
                       type="text"
                       required
-                      value={robloxUsername}
-                      onChange={e => setRobloxUsername(e.target.value)}
-                      placeholder="Username Roblox (perhatikan huruf besar/kecil)"
+                      value={whatsapp}
+                      onChange={e => setWhatsapp(e.target.value)}
+                      placeholder="No. WhatsApp (08xx)"
                       className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
                     />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        required
-                        value={displayName}
-                        onChange={e => setDisplayName(e.target.value)}
-                        placeholder="Display Name Roblox"
-                        className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
-                      />
-                      <input
-                        type="text"
-                        required
-                        value={whatsapp}
-                        onChange={e => setWhatsapp(e.target.value)}
-                        placeholder="No. WhatsApp (08xx)"
-                        className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
-                      />
-                    </div>
+                  </div>
 
-                    <label className="block border border-dashed border-gray-700 hover:border-orange-500 rounded-xl p-3 text-center cursor-pointer transition">
-                      <span className="text-xs text-gray-300">
-                        {paymentProof ? `✅ ${paymentProof.name}` : '☁️ Pilih bukti transfer (JPG, PNG, WEBP)'}
-                      </span>
-                      <input
-                        type="file"
-                        required
-                        accept="image/*"
-                        onChange={e => setPaymentProof(e.target.files[0])}
-                        className="hidden"
-                      />
-                    </label>
+                  <label className="block border border-dashed border-gray-700 hover:border-orange-500 rounded-xl p-3 text-center cursor-pointer transition">
+                    <span className="text-xs text-gray-300">
+                      {paymentProof ? `✅ ${paymentProof.name}` : '☁️ Pilih bukti transfer (JPG, PNG, WEBP)'}
+                    </span>
+                    <input
+                      type="file"
+                      required
+                      accept="image/*"
+                      onChange={e => setPaymentProof(e.target.files[0])}
+                      className="hidden"
+                    />
+                  </label>
 
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-extrabold py-3 rounded-xl transition text-sm"
-                    >
-                      {submitting ? 'Memproses Pesanan...' : '✓ Kirim Order & Bukti TF ke WhatsApp'}
-                    </button>
-                    <p className="text-[11px] text-center text-gray-500">
-                      Satu pesan WhatsApp berisi detail pesanan + link bukti transfer akan dikirim ke admin.
-                    </p>
-                  </form>
-                </>
-              )}
-            </div>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-extrabold py-3 rounded-xl transition text-sm"
+                  >
+                    {submitting ? 'Memproses Pesanan...' : '✓ Kirim Order & Bukti TF ke WhatsApp'}
+                  </button>
+                  <p className="text-[11px] text-center text-gray-500">
+                    Satu pesan WhatsApp berisi detail pesanan + link bukti transfer akan dikirim ke admin.
+                  </p>
+                </form>
+              </>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
