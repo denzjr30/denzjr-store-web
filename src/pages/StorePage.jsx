@@ -281,7 +281,7 @@ export default function StorePage() {
 
             <div className="bg-[#231915] border border-orange-500/30 rounded-xl p-4">
               <p className="text-orange-400 font-bold text-xs mb-1">⚡ Catatan penting</p>
-              <p className="text-gray-300 text-xs">Pastikan username sesuai huruf besar/kecil. Jangan logout saat proses top up berlangsung.</p>
+              <p className="text-gray-300 text-xs">PASTIKAN USERNAME DAN DISPLAYNAME SESUAI HURUS BESAR / KECIL. JIKA TERJADI KESALAHAN, MAKA HAL TERSEBUT DILUAR TANGGUNG JAWAB ADMIN.</p>
             </div>
           </div>
 
