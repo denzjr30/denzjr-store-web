@@ -109,6 +109,29 @@ export default function StorePage() {
   const totalRobux = cart.reduce((sum, item) => sum + item.robux, 0);
   const totalPrice = cart.reduce((sum, item) => sum + item.price, 0);
 
+  const fileToCompressedDataUrl = (file) =>
+    new Promise((resolve) => {
+      if (!file) return resolve('');
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxW = 800;
+          const scale = img.width > maxW ? maxW / img.width : 1;
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        };
+        img.onerror = () => resolve('');
+        img.src = event.target.result;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+
   const handleCheckoutSubmit = async (e) => {
     e.preventDefault();
     if (cart.length === 0) return alert("Keranjang masih kosong!");
@@ -117,25 +140,32 @@ export default function StorePage() {
 
     setSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append('roblox_username', robloxUsername);
-      formData.append('display_name', displayName || robloxUsername);
-      formData.append('buyer_name', displayName || robloxUsername);
-      formData.append('whatsapp', whatsapp);
-      formData.append('robux_amount', totalRobux);
-      formData.append('total_price', totalPrice);
-      formData.append('items', JSON.stringify(cart));
-      formData.append('payment_proof', paymentProof);
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const generatedOrderNumber = `DJS-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      const res = await axios.post(`${API_BASE_URL}/api/orders`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const proofDataUrl = await fileToCompressedDataUrl(paymentProof);
 
-      const orderCode = res.data.order_number || res.data.tracking_code || `DJS-${Math.floor(1000000 + Math.random() * 9000000)}`;
-      let proofUrl = res.data.payment_proof_url || "";
-      if (proofUrl && proofUrl.startsWith('/')) {
-        proofUrl = `${API_BASE_URL}${proofUrl}`;
-      }
+      const orderItems = cart.map((item) => ({
+        robux: Number(item.robux),
+        qty: 1,
+        price: Number(item.price),
+        subtotal: Number(item.price)
+      }));
+
+      const payload = {
+        order_number: generatedOrderNumber,
+        username: robloxUsername.trim(),
+        display_name: (displayName || robloxUsername).trim(),
+        buyer_phone: whatsapp.trim(),
+        items: orderItems,
+        total: Number(totalPrice),
+        status: 'Menunggu konfirmasi',
+        proof_url: proofDataUrl
+      };
+
+      const res = await axios.post(`${API_BASE_URL}/api/orders`, payload);
+      const orderCode = res.data?.order_number || generatedOrderNumber;
 
       const detailItemsText = cart
         .map(item => `• ${item.robux.toLocaleString('id-ID')} Robux - Rp ${item.price.toLocaleString('id-ID')}`)
@@ -146,15 +176,15 @@ export default function StorePage() {
         `📋 INFORMASI PESANAN\n` +
         `------------------------------------\n` +
         `• No. Order : ${orderCode}\n` +
-        `• Username : ${robloxUsername}\n` +
-        `• Display Name : ${displayName || '-'}\n\n` +
+        `• Username : ${robloxUsername.trim()}\n` +
+        `• Display Name : ${displayName.trim() || '-'}\n` +
+        `• No. WhatsApp : ${whatsapp.trim()}\n\n` +
         `🛒 DETAIL ITEM\n` +
         `------------------------------------\n` +
         `${detailItemsText}\n\n` +
         `💰 TOTAL PEMBAYARAN : Rp ${totalPrice.toLocaleString('id-ID')}\n` +
         `------------------------------------\n\n` +
-        (proofUrl ? `✅ Bukti transfer: ${proofUrl}\n\n` : '') +
-        `Mohon diproses ya Admin, terima kasih! 🙏`;
+        `Mohon dicek bukti transfer yang saya lampirkan di chat ini dan segera diproses ya Admin, terima kasih! 🙏`;
 
       setCart([]);
       setIsCartOpen(false);
@@ -163,7 +193,11 @@ export default function StorePage() {
 
       window.open(`https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(waMessage)}`, '_blank');
     } catch (err) {
-      alert("Terjadi kesalahan saat mengirim pesanan. Pastikan koneksi lancar dan coba lagi.");
+      const detail = err.response?.data?.detail;
+      const errMsg = Array.isArray(detail)
+        ? detail.map((d) => `${d.loc?.join('.')}: ${d.msg}`).join(', ')
+        : (detail || err.message);
+      alert(`Gagal mengirim pesanan: ${errMsg}`);
     } finally {
       setSubmitting(false);
     }
