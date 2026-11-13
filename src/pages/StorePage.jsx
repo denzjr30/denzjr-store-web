@@ -54,7 +54,7 @@ export default function StorePage() {
     fetchStoreData();
   }, []);
 
-const fetchStoreData = async () => {
+  const fetchStoreData = async () => {
     try {
       const [shopRes, reviewsRes] = await Promise.allSettled([
         axios.get(`${API_BASE_URL}/api/shop/stock`),
@@ -64,21 +64,8 @@ const fetchStoreData = async () => {
       if (shopRes.status === 'fulfilled' && shopRes.value.data) {
         const data = shopRes.value.data;
 
-        // Ekstrak angka total stok dari berbagai kemungkinan format JSON backend
-        let parsedStock = null;
-        if (typeof data.total_stock === 'number' || (typeof data.total_stock === 'string' && data.total_stock !== '')) {
-          parsedStock = Number(data.total_stock);
-        } else if (typeof data.totalStock === 'number' || (typeof data.totalStock === 'string' && data.totalStock !== '')) {
-          parsedStock = Number(data.totalStock);
-        } else if (typeof data.stock === 'number' || (typeof data.stock === 'string' && data.stock !== '')) {
-          parsedStock = Number(data.stock);
-        } else if (data.stock && typeof data.stock === 'object') {
-          if (data.stock.total !== undefined) parsedStock = Number(data.stock.total);
-          else if (data.stock['0'] !== undefined) parsedStock = Number(data.stock['0']);
-        }
-
-        if (parsedStock !== null && !Number.isNaN(parsedStock)) {
-          setTotalStock(parsedStock);
+        if (data.total_stock !== null && data.total_stock !== undefined && !Number.isNaN(Number(data.total_stock))) {
+          setTotalStock(Number(data.total_stock));
         } else {
           setTotalStock(null);
         }
@@ -89,13 +76,7 @@ const fetchStoreData = async () => {
           setIsOpen(data.is_open);
         }
 
-        if (Array.isArray(data.packages) && data.packages.length > 0) {
-          const updated = DEFAULT_PACKAGES.map(pkg => {
-            const found = data.packages.find(p => Number(p.robux) === pkg.robux);
-            return found && found.price !== undefined ? { ...pkg, price: Number(found.price) } : pkg;
-          });
-          setPackages(updated);
-        } else if (data.prices && typeof data.prices === 'object' && Object.keys(data.prices).length > 0) {
+        if (data.prices && typeof data.prices === 'object' && Object.keys(data.prices).length > 0) {
           const updated = DEFAULT_PACKAGES.map(pkg => ({
             ...pkg,
             price: data.prices[pkg.robux] ? Number(data.prices[pkg.robux]) : pkg.price
