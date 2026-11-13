@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 const ADMIN_WHATSAPP = "6281958085966";
 
 const DEFAULT_PACKAGES = [
-  { robux: 10, price: 2000 },
+  { robux: 10, price: 2000, badge: 'KELIPATAN 10' } },
   { robux: 20, price: 3500 },
   { robux: 30, price: 5000 },
   { robux: 40, price: 6500 },
@@ -15,12 +15,12 @@ const DEFAULT_PACKAGES = [
   { robux: 70, price: 11000 },
   { robux: 80, price: 12500 },
   { robux: 90, price: 13500 },
-  { robux: 100, price: 15500, badge: 'FAVORIT' },
+  { robux: 100, price: 15500, badge: 'KELIPATAN 100' },
   { robux: 200, price: 31000 },
   { robux: 300, price: 46500 },
   { robux: 400, price: 62000 },
   { robux: 500, price: 77500 },
-  { robux: 1000, price: 155000, badge: 'GROSIR' },
+  { robux: 1000, price: 155000, badge: 'FAVORIT' },
   { robux: 2000, price: 310000 },
   { robux: 3000, price: 465000 },
   { robux: 4000, price: 620000 },
