@@ -72,7 +72,10 @@ export default function AdminDashboard() {
       }
 
       if (revRes.status === 'fulfilled') {
-        setReviews(Array.isArray(revRes.value.data) ? revRes.value.data : []);
+        const rawReviews = Array.isArray(revRes.value.data)
+          ? revRes.value.data
+          : (Array.isArray(revRes.value.data?.reviews) ? revRes.value.data.reviews : []);
+        setReviews(rawReviews);
       }
 
       if (shopRes.status === 'fulfilled' && shopRes.value.data) {
@@ -165,14 +168,35 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteReview = async (reviewId) => {
+  const handleDeleteReview = async (rev) => {
+    const revId = rev.review_id || rev.id || rev._id;
+    if (!revId) {
+      alert('ID ulasan tidak ditemukan dari server.');
+      return;
+    }
     if (!window.confirm('Hapus ulasan ini?')) return;
     try {
       const headers = getAuthHeaders();
-      await axios.delete(`${API_BASE_URL}/api/admin/reviews/${reviewId}`, { headers });
+      await axios.delete(
+        `${API_BASE_URL}/api/admin/reviews/${encodeURIComponent(revId)}`,
+        { headers }
+      );
       fetchAllAdminData();
     } catch (err) {
-      alert('Gagal menghapus ulasan.');
+      alert(`Gagal menghapus ulasan: ${err.response?.data?.detail || err.message}`);
+    }
+  };
+
+  const formatHistoryDate = (isoStr) => {
+    if (!isoStr) return '';
+    try {
+      const d = new Date(isoStr);
+      if (Number.isNaN(d.getTime())) return isoStr;
+      const day = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+      const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(':', '.');
+      return `${day}, ${time}`;
+    } catch {
+      return isoStr;
     }
   };
 
@@ -355,6 +379,12 @@ export default function AdminDashboard() {
                 ? ord.items.map(it => `${Number(it.robux || 0).toLocaleString('id-ID')} R$ • Rp ${Number(it.price || 0).toLocaleString('id-ID')}`)
                 : [`${ord.robux_amount || 0} R$ • Rp ${orderTotal.toLocaleString('id-ID')}`];
 
+              const statusHistory = Array.isArray(ord.status_history) && ord.status_history.length > 0
+                ? ord.status_history
+                : (Array.isArray(ord.history) && ord.history.length > 0
+                  ? ord.history
+                  : (ord.created_at ? [{ status: ord.status, timestamp: ord.created_at }] : []));
+
               const cleanPhone = bPhone.replace(/^0/, '62').replace(/[^0-9]/g, '');
               const waUpdateMsg = encodeURIComponent(
                 `Halo *${dName !== '-' ? dName : uName}*, update pesanan DenzJr Store kamu:\n` +
@@ -414,6 +444,20 @@ export default function AdminDashboard() {
                     <span className="text-xl font-extrabold text-orange-500">Rp {orderTotal.toLocaleString('id-ID')}</span>
                   </div>
 
+                  {statusHistory.length > 0 && (
+                    <div className="space-y-1.5">
+                      {statusHistory.map((h, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-xs">
+                          <span className="flex items-center gap-2 text-gray-200">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+                            {h.status}
+                          </span>
+                          <span className="text-gray-500">{formatHistoryDate(h.timestamp || h.time || h.created_at)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {cleanPhone && (
                     <a
                       href={`https://wa.me/${cleanPhone}?text=${waUpdateMsg}`}
@@ -438,10 +482,10 @@ export default function AdminDashboard() {
             <p className="text-sm text-gray-400">Belum ada ulasan masuk.</p>
           ) : (
             <div className="space-y-3">
-              {reviews.map(rev => {
-                const revId = rev.id || rev._id;
+              {reviews.map((rev, index) => {
+                const revKey = rev.review_id || rev.id || rev._id || index;
                 return (
-                  <div key={revId} className="bg-[#0b0f19] border border-gray-800 rounded-xl p-4 flex justify-between items-start gap-4">
+                  <div key={revKey} className="bg-[#0b0f19] border border-gray-800 rounded-xl p-4 flex justify-between items-start gap-4">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-bold text-sm">{rev.name}</span>
@@ -451,7 +495,7 @@ export default function AdminDashboard() {
                       <p className="text-sm text-gray-300">{rev.comment}</p>
                     </div>
                     <button
-                      onClick={() => handleDeleteReview(revId)}
+                      onClick={() => handleDeleteReview(rev)}
                       className="text-red-400 hover:text-red-300 text-xs bg-red-950/60 border border-red-500/30 px-3 py-1.5 rounded-lg"
                     >
                       Hapus
