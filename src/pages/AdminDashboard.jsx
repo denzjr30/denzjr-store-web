@@ -25,7 +25,6 @@ export default function AdminDashboard() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [previewProof, setPreviewProof] = useState(null);
 
-  // Filter & Sort Pesanan
   const [statusFilter, setStatusFilter] = useState('Semua');
   const [sortOrder, setSortOrder] = useState('newest');
 
@@ -62,7 +61,10 @@ export default function AdminDashboard() {
       ]);
 
       if (ordRes.status === 'fulfilled') {
-        setOrders(Array.isArray(ordRes.value.data) ? ordRes.value.data : []);
+        const rawOrders = Array.isArray(ordRes.value.data)
+          ? ordRes.value.data
+          : (Array.isArray(ordRes.value.data?.orders) ? ordRes.value.data.orders : []);
+        setOrders(rawOrders);
       } else if (ordRes.reason?.response?.status === 401 || ordRes.reason?.response?.status === 403) {
         setToken('');
         localStorage.removeItem('admin_token');
@@ -174,7 +176,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Hitung Statistik (Mendukung field 'total' maupun 'total_price')
   const totalOrders = orders.length;
   const totalOrderValue = orders.reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
   const completedRevenue = orders
@@ -219,7 +220,6 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-[#0b0f19] text-white font-sans p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
-        {/* TOP BAR */}
         <header className="flex flex-wrap justify-between items-center gap-4">
           <div>
             <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">DenzJr Store / Admin</p>
@@ -238,7 +238,6 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        {/* 4 KARTU STATISTIK */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
             <p className="text-xs text-gray-400 uppercase mb-1">Total Pesanan</p>
@@ -260,7 +259,6 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* ATUR STOK, TOKO & HARGA ROBUX */}
         <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6 space-y-6">
           <div className="flex flex-wrap justify-between items-start gap-4">
             <div>
@@ -315,7 +313,6 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* FILTER STATUS & DAFTAR PESANAN */}
         <section className="space-y-4">
           <div className="flex flex-wrap justify-between items-center gap-3">
             <div className="flex flex-wrap gap-2">
@@ -354,9 +351,9 @@ export default function AdminDashboard() {
               const rawProof = ord.proof_url || ord.payment_proof_url || '';
               const proofSrc = rawProof.startsWith('/') ? `${API_BASE_URL}${rawProof}` : rawProof;
 
-              const itemsSummary = Array.isArray(ord.items) && ord.items.length > 0
-                ? ord.items.map(it => `${Number(it.robux || 0).toLocaleString('id-ID')} R$ (x${it.qty || 1})`).join(', ')
-                : `${ord.robux_amount || 0} Robux`;
+              const itemsList = Array.isArray(ord.items) && ord.items.length > 0
+                ? ord.items.map(it => `${Number(it.robux || 0).toLocaleString('id-ID')} R$ • Rp ${Number(it.price || 0).toLocaleString('id-ID')}`)
+                : [`${ord.robux_amount || 0} R$ • Rp ${orderTotal.toLocaleString('id-ID')}`];
 
               const cleanPhone = bPhone.replace(/^0/, '62').replace(/[^0-9]/g, '');
               const waUpdateMsg = encodeURIComponent(
@@ -373,9 +370,11 @@ export default function AdminDashboard() {
                       <h3 className="text-lg font-extrabold text-orange-500">{orderCode}</h3>
                       <p className="text-xs text-gray-400">{uName} • {dName} ({bPhone || '-'})</p>
                       <div className="mt-2 flex flex-wrap gap-2 items-center">
-                        <span className="bg-[#1a2234] text-xs px-2.5 py-1 rounded-lg text-gray-300">
-                          {itemsSummary} • Rp {orderTotal.toLocaleString('id-ID')}
-                        </span>
+                        {itemsList.map((label, idx) => (
+                          <span key={idx} className="bg-[#1a2234] text-xs px-2.5 py-1 rounded-lg text-gray-300">
+                            {label}
+                          </span>
+                        ))}
                         {proofSrc && (
                           <button
                             type="button"
@@ -431,7 +430,6 @@ export default function AdminDashboard() {
           )}
         </section>
 
-        {/* MODERASI ULASAN PEMBELI */}
         <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6">
           <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Moderasi</p>
           <h2 className="text-xl font-extrabold mb-4">Ulasan pembeli</h2>
@@ -448,4 +446,53 @@ export default function AdminDashboard() {
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-bold text-sm">{rev.name}</span>
                         <span className="text-amber-400 text-xs">{'★'.repeat(rev.rating || 5)}</span>
-                        {rev.order_number && <span className="text-xs text
+                        {rev.order_number && <span className="text-xs text-gray-500">({rev.order_number})</span>}
+                      </div>
+                      <p className="text-sm text-gray-300">{rev.comment}</p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteReview(revId)}
+                      className="text-red-400 hover:text-red-300 text-xs bg-red-950/60 border border-red-500/30 px-3 py-1.5 rounded-lg"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {previewProof && (
+        <div
+          onClick={() => setPreviewProof(null)}
+          className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#121724] border border-gray-800 rounded-2xl max-w-md w-full p-4 space-y-3"
+          >
+            <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+              <div>
+                <p className="text-xs text-cyan-400 font-bold">{previewProof.orderCode}</p>
+                <p className="text-xs text-gray-400">Bukti transfer • {previewProof.uName}</p>
+              </div>
+              <button
+                onClick={() => setPreviewProof(null)}
+                className="text-gray-400 hover:text-white text-lg font-bold px-2"
+              >
+                ✕
+              </button>
+            </div>
+            <img
+              src={previewProof.src}
+              alt="Bukti Transfer"
+              className="w-full max-h-[70vh] object-contain rounded-xl bg-black"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
