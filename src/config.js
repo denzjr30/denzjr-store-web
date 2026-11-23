@@ -1,1 +1,2 @@
-export const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+// Ganti dengan URL Web App Google Apps Script kamu
+export const API_BASE_URL = "https://script.google.com/macros/s/AKfycbxnacDdKHpTnbB4FACoE0MdM21Fghg72kJRlsVYHm2NuSRluEsJDZd7iZJ0chslVfg/exec";
