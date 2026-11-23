@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
-import { API_BASE_URL } from '../config';
+import { gasStoreApi } from '../gasApi';
 import { Link } from 'react-router-dom';
 
 const ADMIN_WHATSAPP = "6281958085966";
@@ -29,10 +28,14 @@ export default function StatusTracker() {
     setError('');
     setSingleOrder(null);
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/orders/${encodeURIComponent(code)}`);
-      setSingleOrder(res.data);
+      const res = await gasStoreApi.getOrder(code);
+      if (res.error || !res.order) {
+        setError(res.error || 'Nomor order tidak ditemukan. Periksa kembali kode pesananmu.');
+      } else {
+        setSingleOrder(res.order);
+      }
     } catch (err) {
-      setError('Nomor order tidak ditemukan. Periksa kembali kode pesananmu.');
+      setError('Gagal menghubungi server Google Apps Script.');
     } finally {
       setLoading(false);
     }
@@ -46,10 +49,10 @@ export default function StatusTracker() {
     setError('');
     setHistoryOrders([]);
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/orders/by-phone/${encodeURIComponent(phone)}`);
-      const list = Array.isArray(res.data)
-        ? res.data
-        : (Array.isArray(res.data?.orders) ? res.data.orders : []);
+      const res = await gasStoreApi.getOrdersByPhone(phone);
+      const list = Array.isArray(res)
+        ? res
+        : (Array.isArray(res?.orders) ? res.orders : []);
       if (list.length > 0) {
         setHistoryOrders(list);
       } else {
@@ -70,7 +73,9 @@ export default function StatusTracker() {
   const formatDate = (isoStr) => {
     if (!isoStr) return '';
     try {
-      return new Date(isoStr).toLocaleString('id-ID', {
+      const d = new Date(isoStr);
+      if (Number.isNaN(d.getTime())) return isoStr;
+      return d.toLocaleString('id-ID', {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
