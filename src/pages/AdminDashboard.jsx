@@ -217,6 +217,14 @@ export default function AdminDashboard() {
     }
   };
 
+  // Perhitungan Statistik Pesanan (Seperti Versi Sebelumnya)
+  const totalOrders = orders.length;
+  const totalOrderValue = orders.reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
+  const completedRevenue = orders
+    .filter(o => o.status === 'Selesai')
+    .reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
+  const countByStatus = (st) => orders.filter(o => o.status === st).length;
+
   // Perhitungan Putaran Aktif
   const activeRoundOrders = orders.filter(o => Number(o.round || currentRound) === currentRound);
   const activeCompletedOrders = activeRoundOrders.filter(o => o.status === 'Selesai');
@@ -231,8 +239,6 @@ export default function AdminDashboard() {
   const pastProfit = pastRounds.reduce((sum, r) => sum + Number(r.profit || 0), 0);
   const allTimeRevenue = pastRevenue + activeRoundRevenue;
   const allTimeProfit = pastProfit + activeRoundProfit;
-
-  const countByStatus = (st) => orders.filter(o => o.status === st).length;
 
   const availableRounds = Array.from(new Set([
     ...roundsData.map(r => r.round),
@@ -300,7 +306,29 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        {/* Kartu Ringkasan Keuangan Putaran Aktif & Total Akumulasi */}
+        {/* 1. Kartu Ringkasan Pesanan Masuk & Selesai (Seperti Versi Sebelumnya) */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
+            <p className="text-xs text-gray-400 uppercase mb-1">Total Pesanan</p>
+            <p className="text-3xl font-extrabold text-orange-500">{totalOrders}</p>
+          </div>
+          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
+            <p className="text-xs text-gray-400 uppercase mb-1">Total Nilai Pesanan</p>
+            <p className="text-3xl font-extrabold text-orange-500">Rp {totalOrderValue.toLocaleString('id-ID')}</p>
+          </div>
+          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
+            <p className="text-xs text-gray-400 uppercase mb-1">Pendapatan Selesai</p>
+            <p className="text-3xl font-extrabold text-emerald-400">Rp {completedRevenue.toLocaleString('id-ID')}</p>
+          </div>
+          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
+            <p className="text-xs text-gray-400 uppercase mb-2">Per Status</p>
+            <p className="text-xs text-gray-300 leading-relaxed">
+              Menunggu konfirmasi ({countByStatus('Menunggu konfirmasi')}) • Menunggu pembayaran ({countByStatus('Menunggu pembayaran')}) • Pembayaran diterima ({countByStatus('Pembayaran diterima')}) • Selesai ({countByStatus('Selesai')})
+            </p>
+          </div>
+        </section>
+
+        {/* 2. Kartu Ringkasan Keuangan Putaran Aktif & Total Akumulasi */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
             <p className="text-xs text-cyan-400 font-bold uppercase mb-1">Omzet Putaran {currentRound}</p>
@@ -337,7 +365,7 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* Tabel Rekap Riwayat Per Putaran */}
+        {/* 3. Tabel Rekap Riwayat Per Putaran */}
         {roundsData.length > 0 && (
           <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6 space-y-4">
             <div className="flex flex-wrap justify-between items-center gap-3">
@@ -392,7 +420,7 @@ export default function AdminDashboard() {
           </section>
         )}
 
-        {/* Pengaturan Stok, Modal Putaran & Harga */}
+        {/* 4. Pengaturan Stok, Modal Putaran & Harga */}
         <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6 space-y-6">
           <div className="flex flex-wrap justify-between items-start gap-4">
             <div>
@@ -461,15 +489,8 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* Daftar Pesanan Masuk */}
+        {/* 5. Daftar Pesanan Masuk */}
         <section className="space-y-4">
-          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-4 flex flex-wrap justify-between items-center gap-3">
-            <p className="text-xs text-gray-400 uppercase font-bold">Ringkasan Status</p>
-            <p className="text-xs text-gray-300">
-              Menunggu konfirmasi ({countByStatus('Menunggu konfirmasi')}) • Menunggu pembayaran ({countByStatus('Menunggu pembayaran')}) • Pembayaran diterima ({countByStatus('Pembayaran diterima')}) • Selesai ({countByStatus('Selesai')})
-            </p>
-          </div>
-
           <div className="flex flex-wrap justify-between items-center gap-3">
             <div className="flex flex-wrap gap-2">
               {['Semua', 'Menunggu konfirmasi', 'Menunggu pembayaran', 'Pembayaran diterima', 'Selesai'].map(st => (
@@ -625,7 +646,7 @@ export default function AdminDashboard() {
           )}
         </section>
 
-        {/* Moderasi Ulasan */}
+        {/* 6. Moderasi Ulasan */}
         <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6">
           <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Moderasi</p>
           <h2 className="text-xl font-extrabold mb-4">Ulasan pembeli</h2>
