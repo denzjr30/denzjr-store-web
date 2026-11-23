@@ -350,7 +350,8 @@ export default function AdminDashboard() {
               const orderCode = ord.order_number || ord.tracking_code || ord.id || ord._id;
               const uName = ord.username || ord.roblox_username || '-';
               const dName = ord.display_name || ord.buyer_name || '-';
-              const bPhone = ord.buyer_phone || ord.whatsapp || '';
+              const rawPhone = ord.buyer_phone !== undefined && ord.buyer_phone !== null ? String(ord.buyer_phone).trim() : '';
+              const bPhone = rawPhone && !rawPhone.startsWith('0') && !rawPhone.startsWith('62') ? `0${rawPhone}` : rawPhone;
               const orderTotal = Number(ord.total ?? ord.total_price ?? 0);
               const proofSrc = ord.proof_url || ord.payment_proof_url || '';
 
@@ -364,7 +365,7 @@ export default function AdminDashboard() {
                   ? ord.history
                   : (ord.created_at ? [{ status: ord.status, timestamp: ord.created_at }] : []));
 
-              const cleanPhone = bPhone.replace(/^0/, '62').replace(/[^0-9]/g, '');
+              const cleanPhone = String(bPhone).replace(/^0/, '62').replace(/[^0-9]/g, '');
               const waUpdateMsg = encodeURIComponent(
                 `Halo *${dName !== '-' ? dName : uName}*, update pesanan DenzJr Store kamu:\n` +
                 `• No. Order: *${orderCode}*\n` +
