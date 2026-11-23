@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { API_BASE_URL } from '../config';
+import { gasStoreApi } from '../gasApi';
 import { Link } from 'react-router-dom';
 
 const ADMIN_WHATSAPP = "6281958085966";
@@ -14,7 +13,7 @@ const DEFAULT_PACKAGES = [
   { robux: 60, price: 9500 },
   { robux: 70, price: 11000 },
   { robux: 80, price: 12500 },
-  { robux: 90, price: 13500 },
+  { robux: 90, price: 14000 },
   { robux: 100, price: 15500, badge: 'KELIPATAN 100' },
   { robux: 200, price: 31000 },
   { robux: 300, price: 46500 },
@@ -57,12 +56,12 @@ export default function StorePage() {
   const fetchStoreData = async () => {
     try {
       const [shopRes, reviewsRes] = await Promise.allSettled([
-        axios.get(`${API_BASE_URL}/api/shop/stock`),
-        axios.get(`${API_BASE_URL}/api/reviews`)
+        gasStoreApi.getStock(),
+        gasStoreApi.getReviews()
       ]);
 
-      if (shopRes.status === 'fulfilled' && shopRes.value.data) {
-        const data = shopRes.value.data;
+      if (shopRes.status === 'fulfilled' && shopRes.value) {
+        const data = shopRes.value;
 
         if (data.total_stock !== null && data.total_stock !== undefined && !Number.isNaN(Number(data.total_stock))) {
           setTotalStock(Number(data.total_stock));
@@ -85,8 +84,9 @@ export default function StorePage() {
         }
       }
 
-      if (reviewsRes.status === 'fulfilled' && Array.isArray(reviewsRes.value.data)) {
-        setReviews(reviewsRes.value.data);
+      if (reviewsRes.status === 'fulfilled' && reviewsRes.value) {
+        const list = Array.isArray(reviewsRes.value) ? reviewsRes.value : (reviewsRes.value.reviews || []);
+        setReviews(list);
       }
     } catch (err) {
       console.error("Gagal memuat pengaturan toko", err);
@@ -140,10 +140,6 @@ export default function StorePage() {
 
     setSubmitting(true);
     try {
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      const generatedOrderNumber = `DJS-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${Math.floor(1000 + Math.random() * 9000)}`;
-
       const proofDataUrl = await fileToCompressedDataUrl(paymentProof);
 
       const orderItems = cart.map((item) => ({
@@ -153,19 +149,29 @@ export default function StorePage() {
         subtotal: Number(item.price)
       }));
 
-      const payload = {
-        order_number: generatedOrderNumber,
-        username: robloxUsername.trim(),
-        display_name: (displayName || robloxUsername).trim(),
-        buyer_phone: whatsapp.trim(),
-        items: orderItems,
-        total: Number(totalPrice),
-        status: 'Menunggu konfirmasi',
-        proof_url: proofDataUrl
-      };
+      // Kirim ke Google Apps Script (otomatis simpan bukti TF ke Drive & catat di Sheets)
+      const res = await fetch(
+        process.env.REACT_APP_GAS_URL || (await import('../gasApi')).GAS_URL,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'createOrder',
+            username: robloxUsername.trim(),
+            display_name: (displayName || robloxUsername).trim(),
+            buyer_phone: whatsapp.trim(),
+            items: orderItems,
+            total: Number(totalPrice),
+            proof_base64: proofDataUrl
+          })
+        }
+      );
 
-      const res = await axios.post(`${API_BASE_URL}/api/orders`, payload);
-      const orderCode = res.data?.order_number || generatedOrderNumber;
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      const orderCode = data.order_number;
+      const proofDriveLink = data.proof_url || '-';
 
       const detailItemsText = cart
         .map(item => `• ${item.robux.toLocaleString('id-ID')} Robux - Rp ${item.price.toLocaleString('id-ID')}`)
@@ -183,6 +189,7 @@ export default function StorePage() {
         `------------------------------------\n` +
         `${detailItemsText}\n\n` +
         `💰 TOTAL PEMBAYARAN : Rp ${totalPrice.toLocaleString('id-ID')}\n` +
+        `🧾 Bukti TF : ${proofDriveLink}\n` +
         `------------------------------------\n\n` +
         `Mohon dicek bukti transfer yang saya lampirkan di chat ini dan segera diproses ya Admin, terima kasih! 🙏`;
 
@@ -193,11 +200,7 @@ export default function StorePage() {
 
       window.open(`https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(waMessage)}`, '_blank');
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      const errMsg = Array.isArray(detail)
-        ? detail.map((d) => `${d.loc?.join('.')}: ${d.msg}`).join(', ')
-        : (detail || err.message);
-      alert(`Gagal mengirim pesanan: ${errMsg}`);
+      alert(`Gagal mengirim pesanan: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -208,12 +211,14 @@ export default function StorePage() {
     if (!reviewComment.trim()) return alert("Tuliskan pengalaman top up kamu terlebih dahulu.");
     setSendingReview(true);
     try {
-      await axios.post(`${API_BASE_URL}/api/reviews`, {
+      const data = await gasStoreApi.createReview({
         rating,
         name: reviewName.trim() || "Pembeli Anonim",
-        order_number: reviewOrderId.trim(),
+        orderNumber: reviewOrderId.trim(),
         comment: reviewComment.trim()
       });
+      if (data.error) throw new Error(data.error);
+
       setReviewName('');
       setReviewOrderId('');
       setReviewComment('');
@@ -358,7 +363,7 @@ export default function StorePage() {
             <p className="text-xs text-gray-400">Harga transparan • Tanpa biaya tersembunyi</p>
           </div>
 
-          {/* GRID NOMINAL ROBUX (5 KOLOM & BADGE FAVORIT/GROSIR/SULTAN) */}
+          {/* GRID NOMINAL ROBUX */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-14">
             {packages.map((pkg) => (
               <div 
@@ -469,7 +474,7 @@ export default function StorePage() {
         </main>
       </div>
 
-      {/* FLOATING CART BAR (SELALU MELAYANG DI LAYAR) */}
+      {/* FLOATING CART BAR */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#0d121d]/95 border-t border-gray-800 shadow-[0_-10px_30px_rgba(0,0,0,0.6)] z-40">
         <div className="max-w-6xl mx-auto px-4 py-3.5 flex justify-between items-center">
           <div>
@@ -492,7 +497,7 @@ export default function StorePage() {
         </div>
       </div>
 
-      {/* MODAL / DRAWER KERANJANG & CHECKOUT QRIS */}
+      {/* MODAL KERANJANG & CHECKOUT QRIS */}
       {isCartOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-[#121724] border border-gray-800 rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto p-5 relative">
