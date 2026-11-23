@@ -18,13 +18,23 @@ export default function AdminDashboard() {
 
   const [orders, setOrders] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [roundsData, setRoundsData] = useState([]);
+  const [currentRound, setCurrentRound] = useState(2);
+  const [roundCapital, setRoundCapital] = useState('615000');
+
   const [stock, setStock] = useState('');
   const [isOpen, setIsOpen] = useState(true);
   const [prices, setPrices] = useState(DEFAULT_PRICES);
   const [savingSettings, setSavingSettings] = useState(false);
   const [previewProof, setPreviewProof] = useState(null);
 
+  const [showNewRoundModal, setShowNewRoundModal] = useState(false);
+  const [nextRoundCapital, setNextRoundCapital] = useState('615000');
+  const [nextRoundStock, setNextRoundStock] = useState('5000');
+  const [startingNewRound, setStartingNewRound] = useState(false);
+
   const [statusFilter, setStatusFilter] = useState('Semua');
+  const [roundFilter, setRoundFilter] = useState('Semua');
   const [sortOrder, setSortOrder] = useState('newest');
 
   useEffect(() => {
@@ -51,10 +61,11 @@ export default function AdminDashboard() {
 
   const fetchAllAdminData = async () => {
     try {
-      const [ordRes, shopRes, revRes] = await Promise.allSettled([
+      const [ordRes, shopRes, revRes, rndRes] = await Promise.allSettled([
         gasStoreApi.adminGetOrders(token),
         gasStoreApi.getStock(),
-        gasStoreApi.getReviews()
+        gasStoreApi.getReviews(),
+        gasStoreApi.adminGetRounds(token)
       ]);
 
       if (ordRes.status === 'fulfilled' && ordRes.value) {
@@ -76,11 +87,17 @@ export default function AdminDashboard() {
         setReviews(rawReviews);
       }
 
+      if (rndRes.status === 'fulfilled' && rndRes.value && Array.isArray(rndRes.value.rounds)) {
+        setRoundsData(rndRes.value.rounds);
+      }
+
       if (shopRes.status === 'fulfilled' && shopRes.value) {
         const s = shopRes.value;
         const rawStock = s.total_stock;
         setStock(rawStock !== null && rawStock !== undefined && rawStock !== '' ? String(rawStock) : '');
         setIsOpen(s.closed !== undefined ? !s.closed : (s.is_open !== undefined ? s.is_open : true));
+        if (s.current_round) setCurrentRound(Number(s.current_round));
+        if (s.round_capital !== undefined) setRoundCapital(String(s.round_capital));
 
         if (s.prices && typeof s.prices === 'object') {
           setPrices({ ...DEFAULT_PRICES, ...s.prices });
@@ -117,16 +134,36 @@ export default function AdminDashboard() {
       const res = await gasStoreApi.adminUpdateConfig(token, {
         closed: !isOpen,
         totalStock: stockValue,
+        roundCapital: Number(roundCapital || 0),
         prices: formattedPrices
       });
       if (res.error) throw new Error(res.error);
 
-      alert('Perubahan stok & seluruh harga berhasil disimpan ke Google Sheets!');
+      alert('Perubahan stok, modal putaran & seluruh harga berhasil disimpan ke Google Sheets!');
       fetchAllAdminData();
     } catch (err) {
       alert(`Gagal menyimpan: ${err.message}`);
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const handleStartNewRound = async (e) => {
+    e.preventDefault();
+    setStartingNewRound(true);
+    try {
+      const res = await gasStoreApi.adminStartNewRound(token, {
+        newCapital: Number(nextRoundCapital || 0),
+        newStock: nextRoundStock === '' ? 5000 : Number(nextRoundStock)
+      });
+      if (res.error) throw new Error(res.error);
+      setShowNewRoundModal(false);
+      alert(`Berhasil memulai Putaran ke-${res.new_round}!`);
+      fetchAllAdminData();
+    } catch (err) {
+      alert(`Gagal memulai putaran baru: ${err.message}`);
+    } finally {
+      setStartingNewRound(false);
     }
   };
 
@@ -180,16 +217,32 @@ export default function AdminDashboard() {
     }
   };
 
-  const totalOrders = orders.length;
-  const totalOrderValue = orders.reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
-  const completedRevenue = orders
-    .filter(o => o.status === 'Selesai')
-    .reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
+  // Perhitungan Putaran Aktif
+  const activeRoundOrders = orders.filter(o => Number(o.round || currentRound) === currentRound);
+  const activeCompletedOrders = activeRoundOrders.filter(o => o.status === 'Selesai');
+  const activeRoundRevenue = activeCompletedOrders.reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
+  const activeRoundRobuxSold = activeCompletedOrders.reduce((sum, o) => sum + (Number(o.total_robux) || 0), 0);
+  const capitalNum = Number(roundCapital || 0);
+  const activeRoundProfit = activeRoundRevenue - capitalNum;
+
+  // Perhitungan Akumulasi Seluruh Putaran (termasuk arsip Putaran 1 di Rekap_Putaran)
+  const pastRounds = roundsData.filter(r => r.round < currentRound);
+  const pastRevenue = pastRounds.reduce((sum, r) => sum + Number(r.revenue || 0), 0);
+  const pastProfit = pastRounds.reduce((sum, r) => sum + Number(r.profit || 0), 0);
+  const allTimeRevenue = pastRevenue + activeRoundRevenue;
+  const allTimeProfit = pastProfit + activeRoundProfit;
 
   const countByStatus = (st) => orders.filter(o => o.status === st).length;
 
+  const availableRounds = Array.from(new Set([
+    ...roundsData.map(r => r.round),
+    ...orders.map(o => Number(o.round || currentRound)),
+    currentRound
+  ])).sort((a, b) => b - a);
+
   const filteredOrders = orders
     .filter(o => statusFilter === 'Semua' || o.status === statusFilter)
+    .filter(o => roundFilter === 'Semua' || String(o.round || currentRound) === String(roundFilter))
     .sort((a, b) => sortOrder === 'newest' ? 0 : -1);
 
   if (!token) {
@@ -226,8 +279,13 @@ export default function AdminDashboard() {
       <div className="max-w-5xl mx-auto space-y-6">
         <header className="flex flex-wrap justify-between items-center gap-4">
           <div>
-            <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">DenzJr Store / Admin (GAS Backup)</p>
-            <h1 className="text-3xl font-extrabold">Pesanan masuk</h1>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">DenzJr Store / Admin</p>
+              <span className="bg-orange-500/20 border border-orange-500/40 text-orange-400 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                Putaran ke-{currentRound}
+              </span>
+            </div>
+            <h1 className="text-3xl font-extrabold">Dashboard & Siklus Restock</h1>
           </div>
           <div className="flex items-center gap-3">
             <Link to="/" className="bg-[#121724] border border-gray-800 px-4 py-2 rounded-xl text-sm text-gray-300 hover:text-white">
@@ -242,32 +300,104 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Kartu Ringkasan Keuangan Putaran Aktif & Total Akumulasi */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-gray-400 uppercase mb-1">Total Pesanan</p>
-            <p className="text-3xl font-extrabold text-orange-500">{totalOrders}</p>
+            <p className="text-xs text-cyan-400 font-bold uppercase mb-1">Omzet Putaran {currentRound}</p>
+            <p className="text-2xl font-extrabold text-white">Rp {activeRoundRevenue.toLocaleString('id-ID')}</p>
+            <p className="text-xs text-gray-400 mt-1">{activeRoundRobuxSold.toLocaleString('id-ID')} R$ terjual ({activeCompletedOrders.length} selesai)</p>
           </div>
+
           <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-gray-400 uppercase mb-1">Total Nilai Pesanan</p>
-            <p className="text-3xl font-extrabold text-orange-500">Rp {totalOrderValue.toLocaleString('id-ID')}</p>
+            <p className="text-xs text-gray-400 font-bold uppercase mb-1">Modal Putaran {currentRound}</p>
+            <p className="text-2xl font-extrabold text-orange-400">Rp {capitalNum.toLocaleString('id-ID')}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {activeRoundRevenue >= capitalNum
+                ? '✅ Modal sudah balik (BEP)'
+                : `Kurang Rp ${(capitalNum - activeRoundRevenue).toLocaleString('id-ID')} untuk BEP`}
+            </p>
           </div>
+
           <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-gray-400 uppercase mb-1">Pendapatan Selesai</p>
-            <p className="text-3xl font-extrabold text-emerald-400">Rp {completedRevenue.toLocaleString('id-ID')}</p>
+            <p className="text-xs text-gray-400 font-bold uppercase mb-1">Laba Bersih Putaran {currentRound}</p>
+            <p className={`text-2xl font-extrabold ${activeRoundProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {activeRoundProfit >= 0 ? '+' : ''}Rp {activeRoundProfit.toLocaleString('id-ID')}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">Omzet kotor dikurangi modal</p>
           </div>
+
           <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-gray-400 uppercase mb-2">Per Status</p>
-            <p className="text-xs text-gray-300 leading-relaxed">
-              Menunggu konfirmasi ({countByStatus('Menunggu konfirmasi')}) • Menunggu pembayaran ({countByStatus('Menunggu pembayaran')}) • Pembayaran diterima ({countByStatus('Pembayaran diterima')}) • Selesai ({countByStatus('Selesai')})
+            <p className="text-xs text-amber-400 font-bold uppercase mb-1">Total Semua Putaran</p>
+            <p className="text-2xl font-extrabold text-emerald-400">Rp {allTimeRevenue.toLocaleString('id-ID')}</p>
+            <p className="text-xs text-gray-300 mt-1">
+              Total Laba: <span className={allTimeProfit >= 0 ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+                Rp {allTimeProfit.toLocaleString('id-ID')}
+              </span>
             </p>
           </div>
         </section>
 
+        {/* Tabel Rekap Riwayat Per Putaran */}
+        {roundsData.length > 0 && (
+          <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6 space-y-4">
+            <div className="flex flex-wrap justify-between items-center gap-3">
+              <div>
+                <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Laporan Siklus</p>
+                <h2 className="text-xl font-extrabold">Rekap Per Putaran Restock</h2>
+              </div>
+              <button
+                onClick={() => {
+                  setNextRoundCapital(roundCapital || '615000');
+                  setNextRoundStock('5000');
+                  setShowNewRoundModal(true);
+                }}
+                className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition"
+              >
+                🔄 Mulai Putaran Baru (Restock)
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-xs text-gray-400 uppercase">
+                    <th className="py-2.5 px-3">Putaran</th>
+                    <th className="py-2.5 px-3">Modal Restock</th>
+                    <th className="py-2.5 px-3">Robux Terjual</th>
+                    <th className="py-2.5 px-3">Omzet Kotor</th>
+                    <th className="py-2.5 px-3">Laba Bersih</th>
+                    <th className="py-2.5 px-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800/60">
+                  {roundsData.map((r) => (
+                    <tr key={r.round} className="hover:bg-[#161d2e]">
+                      <td className="py-3 px-3 font-bold text-orange-400">Putaran {r.round}</td>
+                      <td className="py-3 px-3 text-gray-300">Rp {Number(r.modal).toLocaleString('id-ID')}</td>
+                      <td className="py-3 px-3 text-cyan-400 font-semibold">{Number(r.robux_sold).toLocaleString('id-ID')} R$</td>
+                      <td className="py-3 px-3 font-bold text-white">Rp {Number(r.revenue).toLocaleString('id-ID')}</td>
+                      <td className={`py-3 px-3 font-extrabold ${Number(r.profit) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {Number(r.profit) >= 0 ? '+' : ''}Rp {Number(r.profit).toLocaleString('id-ID')}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${r.status === 'Berjalan' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-400'}`}>
+                          {r.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* Pengaturan Stok, Modal Putaran & Harga */}
         <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6 space-y-6">
           <div className="flex flex-wrap justify-between items-start gap-4">
             <div>
-              <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Stok Robux</p>
-              <h2 className="text-xl font-extrabold">Atur stok & toko</h2>
+              <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Stok & Modal Aktif</p>
+              <h2 className="text-xl font-extrabold">Atur stok, modal putaran & toko</h2>
             </div>
             <button
               onClick={handleToggleShopStatus}
@@ -277,16 +407,30 @@ export default function AdminDashboard() {
             </button>
           </div>
 
-          <div>
-            <label className="block text-xs text-gray-400 mb-1.5">Total stok Robux kamu</label>
-            <input
-              type="number"
-              value={stock}
-              onChange={e => setStock(e.target.value)}
-              placeholder="Contoh: 5000"
-              className="w-full max-w-xs bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-white font-bold focus:border-orange-500 outline-none"
-            />
-            <p className="text-xs text-gray-500 mt-1.5">Kosongkan = stok tidak dibatasi. Angka ini tampil di website publik dan berkurang otomatis saat pesanan selesai.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1.5">Total stok Robux aktif (Putaran {currentRound})</label>
+              <input
+                type="number"
+                value={stock}
+                onChange={e => setStock(e.target.value)}
+                placeholder="Contoh: 5000"
+                className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-white font-bold focus:border-orange-500 outline-none"
+              />
+              <p className="text-xs text-gray-500 mt-1.5">Berkurang otomatis saat pesanan selesai.</p>
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-400 mb-1.5">Modal restock Putaran {currentRound} (Rp)</label>
+              <input
+                type="number"
+                value={roundCapital}
+                onChange={e => setRoundCapital(e.target.value)}
+                placeholder="Contoh: 615000"
+                className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-orange-400 font-bold focus:border-orange-500 outline-none"
+              />
+              <p className="text-xs text-gray-500 mt-1.5">Dipakai menghitung BEP & Laba Bersih putaran ini.</p>
+            </div>
           </div>
 
           <div className="border-t border-gray-800 pt-5">
@@ -312,12 +456,20 @@ export default function AdminDashboard() {
               disabled={savingSettings}
               className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-6 py-3 rounded-xl text-sm transition"
             >
-              {savingSettings ? 'Menyimpan...' : '💾 Simpan Perubahan Stok & Harga'}
+              {savingSettings ? 'Menyimpan...' : '💾 Simpan Perubahan Stok, Modal & Harga'}
             </button>
           </div>
         </section>
 
+        {/* Daftar Pesanan Masuk */}
         <section className="space-y-4">
+          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-4 flex flex-wrap justify-between items-center gap-3">
+            <p className="text-xs text-gray-400 uppercase font-bold">Ringkasan Status</p>
+            <p className="text-xs text-gray-300">
+              Menunggu konfirmasi ({countByStatus('Menunggu konfirmasi')}) • Menunggu pembayaran ({countByStatus('Menunggu pembayaran')}) • Pembayaran diterima ({countByStatus('Pembayaran diterima')}) • Selesai ({countByStatus('Selesai')})
+            </p>
+          </div>
+
           <div className="flex flex-wrap justify-between items-center gap-3">
             <div className="flex flex-wrap gap-2">
               {['Semua', 'Menunggu konfirmasi', 'Menunggu pembayaran', 'Pembayaran diterima', 'Selesai'].map(st => (
@@ -331,14 +483,27 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            <select
-              value={sortOrder}
-              onChange={e => setSortOrder(e.target.value)}
-              className="bg-[#121724] border border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-300 outline-none"
-            >
-              <option value="newest">Terbaru dulu</option>
-              <option value="oldest">Terlama dulu</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={roundFilter}
+                onChange={e => setRoundFilter(e.target.value)}
+                className="bg-[#121724] border border-gray-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-bold outline-none"
+              >
+                <option value="Semua">Semua Putaran</option>
+                {availableRounds.map(rNum => (
+                  <option key={rNum} value={rNum}>Putaran {rNum}</option>
+                ))}
+              </select>
+
+              <select
+                value={sortOrder}
+                onChange={e => setSortOrder(e.target.value)}
+                className="bg-[#121724] border border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-300 outline-none"
+              >
+                <option value="newest">Terbaru dulu</option>
+                <option value="oldest">Terlama dulu</option>
+              </select>
+            </div>
           </div>
 
           {filteredOrders.length === 0 ? (
@@ -354,6 +519,7 @@ export default function AdminDashboard() {
               const bPhone = rawPhone && !rawPhone.startsWith('0') && !rawPhone.startsWith('62') ? `0${rawPhone}` : rawPhone;
               const orderTotal = Number(ord.total ?? ord.total_price ?? 0);
               const proofSrc = ord.proof_url || ord.payment_proof_url || '';
+              const orderRound = ord.round || currentRound;
 
               const itemsList = Array.isArray(ord.items) && ord.items.length > 0
                 ? ord.items.map(it => `${Number(it.robux || 0).toLocaleString('id-ID')} R$ • Rp ${Number(it.price || 0).toLocaleString('id-ID')}`)
@@ -377,7 +543,12 @@ export default function AdminDashboard() {
                 <div key={orderCode} className="bg-[#121724] border border-gray-800 rounded-2xl p-5 space-y-4">
                   <div className="flex flex-wrap justify-between items-start gap-3">
                     <div>
-                      <h3 className="text-lg font-extrabold text-orange-500">{orderCode}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-extrabold text-orange-500">{orderCode}</h3>
+                        <span className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold px-2 py-0.5 rounded-md">
+                          Putaran {orderRound}
+                        </span>
+                      </div>
                       <p className="text-xs text-gray-400">{uName} • {dName} ({bPhone || '-'})</p>
                       <div className="mt-2 flex flex-wrap gap-2 items-center">
                         {itemsList.map((label, idx) => (
@@ -454,6 +625,7 @@ export default function AdminDashboard() {
           )}
         </section>
 
+        {/* Moderasi Ulasan */}
         <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6">
           <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Moderasi</p>
           <h2 className="text-xl font-extrabold mb-4">Ulasan pembeli</h2>
@@ -488,6 +660,71 @@ export default function AdminDashboard() {
         </section>
       </div>
 
+      {/* Modal Mulai Putaran Baru (Restock) */}
+      {showNewRoundModal && (
+        <div
+          onClick={() => setShowNewRoundModal(false)}
+          className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#121724] border border-gray-800 rounded-2xl max-w-md w-full p-6 space-y-4"
+          >
+            <div>
+              <p className="text-xs text-cyan-400 font-bold uppercase">Siklus Restock Baru</p>
+              <h3 className="text-xl font-extrabold">Mulai Putaran ke-{currentRound + 1}</h3>
+              <p className="text-xs text-gray-400 mt-1">
+                Putaran {currentRound} akan ditandai <strong>Selesai</strong> di rekap laporan, dan order berikutnya akan otomatis masuk ke Putaran {currentRound + 1}.
+              </p>
+            </div>
+
+            <form onSubmit={handleStartNewRound} className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-300 mb-1">Modal Restock Putaran {currentRound + 1} (Rp)</label>
+                <input
+                  type="number"
+                  required
+                  value={nextRoundCapital}
+                  onChange={(e) => setNextRoundCapital(e.target.value)}
+                  placeholder="Contoh: 615000"
+                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-white font-bold focus:border-orange-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-300 mb-1">Stok Robux Baru (R$)</label>
+                <input
+                  type="number"
+                  required
+                  value={nextRoundStock}
+                  onChange={(e) => setNextRoundStock(e.target.value)}
+                  placeholder="Contoh: 5000"
+                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-cyan-400 font-bold focus:border-orange-500 outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewRoundModal(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs text-gray-400 hover:text-white"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={startingNewRound}
+                  className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition"
+                >
+                  {startingNewRound ? 'Memproses...' : `Mulai Putaran ${currentRound + 1}`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Preview Bukti Transfer */}
       {previewProof && (
         <div
           onClick={() => setPreviewProof(null)}
