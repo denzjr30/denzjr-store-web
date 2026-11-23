@@ -238,7 +238,7 @@ export default function AdminDashboard() {
   const pastRevenue = pastRounds.reduce((sum, r) => sum + Number(r.revenue || 0), 0);
   const pastProfit = pastRounds.reduce((sum, r) => sum + Number(r.profit || 0), 0);
   const allTimeRevenue = pastRevenue + activeRoundRevenue;
-  const allTimeProfit = pastProfit + activeRoundProfit;
+  const allTimeProfit = pastProfit + (activeRoundProfit > 0 ? activeRoundProfit : 0);
 
   const availableRounds = Array.from(new Set([
     ...roundsData.map(r => r.round),
