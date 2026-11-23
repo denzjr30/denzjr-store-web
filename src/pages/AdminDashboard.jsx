@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { API_BASE_URL } from '../config';
+import { gasStoreApi } from '../gasApi';
 import { Link } from 'react-router-dom';
 
 const NOMINAL_LIST = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000, 4000, 5000];
 
 const DEFAULT_PRICES = {
   10: 2000, 20: 3500, 30: 5000, 40: 6500, 50: 8000,
-  60: 9500, 70: 11000, 80: 12500, 90: 13500, 100: 15500,
+  60: 9500, 70: 11000, 80: 12500, 90: 14000, 100: 15500,
   200: 31000, 300: 46500, 400: 62000, 500: 77500, 1000: 155000,
   2000: 310000, 3000: 465000, 4000: 620000, 5000: 750000
 };
 
 export default function AdminDashboard() {
   const [pin, setPin] = useState('');
-  const [token, setToken] = useState(localStorage.getItem('admin_token') || '');
+  const [token, setToken] = useState(localStorage.getItem('admin_token_gas') || '');
   const [authError, setAuthError] = useState('');
 
   const [orders, setOrders] = useState([]);
@@ -38,50 +37,49 @@ export default function AdminDashboard() {
     e.preventDefault();
     setAuthError('');
     try {
-      const res = await axios.post(`${API_BASE_URL}/api/admin/login`, { pin });
-      const jwt = typeof res.data === 'string' ? res.data : (res.data.token || res.data.access_token || pin);
-      setToken(jwt);
-      localStorage.setItem('admin_token', jwt);
+      const res = await gasStoreApi.adminLogin(pin);
+      if (res.error || !res.token) {
+        setAuthError(res.error || 'PIN Admin tidak valid!');
+        return;
+      }
+      setToken(res.token);
+      localStorage.setItem('admin_token_gas', res.token);
     } catch (err) {
-      setAuthError('PIN Admin tidak valid!');
+      setAuthError('Gagal terhubung ke server Google Apps Script!');
     }
   };
 
-  const getAuthHeaders = () => ({
-    Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`
-  });
-
   const fetchAllAdminData = async () => {
     try {
-      const headers = getAuthHeaders();
       const [ordRes, shopRes, revRes] = await Promise.allSettled([
-        axios.get(`${API_BASE_URL}/api/admin/orders`, { headers }),
-        axios.get(`${API_BASE_URL}/api/shop/stock`),
-        axios.get(`${API_BASE_URL}/api/reviews`)
+        gasStoreApi.adminGetOrders(token),
+        gasStoreApi.getStock(),
+        gasStoreApi.getReviews()
       ]);
 
-      if (ordRes.status === 'fulfilled') {
-        const rawOrders = Array.isArray(ordRes.value.data)
-          ? ordRes.value.data
-          : (Array.isArray(ordRes.value.data?.orders) ? ordRes.value.data.orders : []);
+      if (ordRes.status === 'fulfilled' && ordRes.value) {
+        if (ordRes.value.error === 'Unauthorized') {
+          setToken('');
+          localStorage.removeItem('admin_token_gas');
+          return;
+        }
+        const rawOrders = Array.isArray(ordRes.value)
+          ? ordRes.value
+          : (Array.isArray(ordRes.value.orders) ? ordRes.value.orders : []);
         setOrders(rawOrders);
-      } else if (ordRes.reason?.response?.status === 401 || ordRes.reason?.response?.status === 403) {
-        setToken('');
-        localStorage.removeItem('admin_token');
-        return;
       }
 
-      if (revRes.status === 'fulfilled') {
-        const rawReviews = Array.isArray(revRes.value.data)
-          ? revRes.value.data
-          : (Array.isArray(revRes.value.data?.reviews) ? revRes.value.data.reviews : []);
+      if (revRes.status === 'fulfilled' && revRes.value) {
+        const rawReviews = Array.isArray(revRes.value)
+          ? revRes.value
+          : (Array.isArray(revRes.value.reviews) ? revRes.value.reviews : []);
         setReviews(rawReviews);
       }
 
-      if (shopRes.status === 'fulfilled' && shopRes.value.data) {
-        const s = shopRes.value.data;
+      if (shopRes.status === 'fulfilled' && shopRes.value) {
+        const s = shopRes.value;
         const rawStock = s.total_stock;
-        setStock(rawStock !== null && rawStock !== undefined ? String(rawStock) : '');
+        setStock(rawStock !== null && rawStock !== undefined && rawStock !== '' ? String(rawStock) : '');
         setIsOpen(s.closed !== undefined ? !s.closed : (s.is_open !== undefined ? s.is_open : true));
 
         if (s.prices && typeof s.prices === 'object') {
@@ -96,12 +94,10 @@ export default function AdminDashboard() {
   const handleToggleShopStatus = async () => {
     const nextOpenState = !isOpen;
     try {
-      const headers = getAuthHeaders();
-      await axios.put(
-        `${API_BASE_URL}/api/admin/shop-status`,
-        { closed: !nextOpenState },
-        { headers }
-      );
+      const res = await gasStoreApi.adminUpdateConfig(token, {
+        closed: !nextOpenState
+      });
+      if (res.error) throw new Error(res.error);
       setIsOpen(nextOpenState);
       alert(nextOpenState ? 'Status toko diubah menjadi BUKA!' : 'Status toko diubah menjadi TUTUP sementara!');
     } catch (err) {
@@ -112,29 +108,23 @@ export default function AdminDashboard() {
   const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
-      const headers = getAuthHeaders();
       const stockValue = stock === '' ? null : Number(stock);
+      const formattedPrices = {};
+      NOMINAL_LIST.forEach((nom) => {
+        formattedPrices[String(nom)] = Number(prices[nom] || DEFAULT_PRICES[nom]);
+      });
 
-      await axios.put(
-        `${API_BASE_URL}/api/admin/total-stock`,
-        { robux: 0, stock: stockValue, total_stock: stockValue },
-        { headers }
-      );
+      const res = await gasStoreApi.adminUpdateConfig(token, {
+        closed: !isOpen,
+        totalStock: stockValue,
+        prices: formattedPrices
+      });
+      if (res.error) throw new Error(res.error);
 
-      await Promise.all(
-        NOMINAL_LIST.map((nom) =>
-          axios.put(
-            `${API_BASE_URL}/api/admin/price`,
-            { robux: Number(nom), price: Number(prices[nom] || DEFAULT_PRICES[nom]) },
-            { headers }
-          )
-        )
-      );
-
-      alert('Perubahan stok & seluruh harga berhasil disimpan!');
+      alert('Perubahan stok & seluruh harga berhasil disimpan ke Google Sheets!');
       fetchAllAdminData();
     } catch (err) {
-      alert(`Gagal menyimpan: ${err.response?.data?.detail || err.message}`);
+      alert(`Gagal menyimpan: ${err.message}`);
     } finally {
       setSavingSettings(false);
     }
@@ -142,12 +132,8 @@ export default function AdminDashboard() {
 
   const handleStatusChange = async (orderNumber, newStatus) => {
     try {
-      const headers = getAuthHeaders();
-      await axios.patch(
-        `${API_BASE_URL}/api/admin/orders/${encodeURIComponent(orderNumber)}`,
-        { status: newStatus },
-        { headers }
-      );
+      const res = await gasStoreApi.adminUpdateStatus(token, orderNumber, newStatus);
+      if (res.error) throw new Error(res.error);
       fetchAllAdminData();
     } catch (err) {
       alert('Gagal mengubah status pesanan.');
@@ -157,11 +143,8 @@ export default function AdminDashboard() {
   const handleDeleteOrder = async (orderNumber) => {
     if (!window.confirm(`Hapus pesanan ${orderNumber} secara permanen?`)) return;
     try {
-      const headers = getAuthHeaders();
-      await axios.delete(
-        `${API_BASE_URL}/api/admin/orders/${encodeURIComponent(orderNumber)}`,
-        { headers }
-      );
+      const res = await gasStoreApi.adminDeleteOrder(token, orderNumber);
+      if (res.error) throw new Error(res.error);
       fetchAllAdminData();
     } catch (err) {
       alert('Gagal menghapus pesanan.');
@@ -171,19 +154,16 @@ export default function AdminDashboard() {
   const handleDeleteReview = async (rev) => {
     const revId = rev.review_id || rev.id || rev._id;
     if (!revId) {
-      alert('ID ulasan tidak ditemukan dari server.');
+      alert('ID ulasan tidak ditemukan.');
       return;
     }
     if (!window.confirm('Hapus ulasan ini?')) return;
     try {
-      const headers = getAuthHeaders();
-      await axios.delete(
-        `${API_BASE_URL}/api/admin/reviews/${encodeURIComponent(revId)}`,
-        { headers }
-      );
+      const res = await gasStoreApi.adminDeleteReview(token, revId);
+      if (res.error) throw new Error(res.error);
       fetchAllAdminData();
     } catch (err) {
-      alert(`Gagal menghapus ulasan: ${err.response?.data?.detail || err.message}`);
+      alert(`Gagal menghapus ulasan: ${err.message}`);
     }
   };
 
@@ -210,7 +190,7 @@ export default function AdminDashboard() {
 
   const filteredOrders = orders
     .filter(o => statusFilter === 'Semua' || o.status === statusFilter)
-    .sort((a, b) => sortOrder === 'newest' ? -1 : 1);
+    .sort((a, b) => sortOrder === 'newest' ? 0 : -1);
 
   if (!token) {
     return (
@@ -246,7 +226,7 @@ export default function AdminDashboard() {
       <div className="max-w-5xl mx-auto space-y-6">
         <header className="flex flex-wrap justify-between items-center gap-4">
           <div>
-            <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">DenzJr Store / Admin</p>
+            <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">DenzJr Store / Admin (GAS Backup)</p>
             <h1 className="text-3xl font-extrabold">Pesanan masuk</h1>
           </div>
           <div className="flex items-center gap-3">
@@ -256,7 +236,7 @@ export default function AdminDashboard() {
             <button onClick={fetchAllAdminData} className="bg-orange-600 hover:bg-orange-500 px-4 py-2 rounded-xl text-sm font-bold transition">
               ↻ Segarkan
             </button>
-            <button onClick={() => { setToken(''); localStorage.removeItem('admin_token'); }} className="bg-red-950/60 border border-red-500/40 text-red-400 px-3 py-2 rounded-xl text-sm">
+            <button onClick={() => { setToken(''); localStorage.removeItem('admin_token_gas'); }} className="bg-red-950/60 border border-red-500/40 text-red-400 px-3 py-2 rounded-xl text-sm">
               Keluar
             </button>
           </div>
@@ -303,7 +283,7 @@ export default function AdminDashboard() {
               type="number"
               value={stock}
               onChange={e => setStock(e.target.value)}
-              placeholder="Contoh: 510"
+              placeholder="Contoh: 5000"
               className="w-full max-w-xs bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-white font-bold focus:border-orange-500 outline-none"
             />
             <p className="text-xs text-gray-500 mt-1.5">Kosongkan = stok tidak dibatasi. Angka ini tampil di website publik dan berkurang otomatis saat pesanan selesai.</p>
@@ -372,8 +352,7 @@ export default function AdminDashboard() {
               const dName = ord.display_name || ord.buyer_name || '-';
               const bPhone = ord.buyer_phone || ord.whatsapp || '';
               const orderTotal = Number(ord.total ?? ord.total_price ?? 0);
-              const rawProof = ord.proof_url || ord.payment_proof_url || '';
-              const proofSrc = rawProof.startsWith('/') ? `${API_BASE_URL}${rawProof}` : rawProof;
+              const proofSrc = ord.proof_url || ord.payment_proof_url || '';
 
               const itemsList = Array.isArray(ord.items) && ord.items.length > 0
                 ? ord.items.map(it => `${Number(it.robux || 0).toLocaleString('id-ID')} R$ • Rp ${Number(it.price || 0).toLocaleString('id-ID')}`)
@@ -534,6 +513,16 @@ export default function AdminDashboard() {
               alt="Bukti Transfer"
               className="w-full max-h-[70vh] object-contain rounded-xl bg-black"
             />
+            <div className="text-center">
+              <a
+                href={previewProof.src}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-cyan-400 underline hover:text-cyan-300"
+              >
+                Buka gambar ukuran penuh di Google Drive ↗
+              </a>
+            </div>
           </div>
         </div>
       )}
