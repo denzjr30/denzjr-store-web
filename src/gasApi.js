@@ -1,7 +1,6 @@
 // Ganti dengan Web App URL dari hasil Deploy Google Apps Script kamu
 export const GAS_URL = process.env.REACT_APP_GAS_URL || "https://script.google.com/macros/s/AKfycbxnacDdKHpTnbB4FACoE0MdM21Fghg72kJRlsVYHm2NuSRluEsJDZd7iZJ0chslVfg/exec";
 
-// Helper untuk GET request ke GAS
 async function gasGet(params) {
   const url = new URL(GAS_URL);
   Object.keys(params).forEach((key) => url.searchParams.append(key, params[key]));
@@ -9,7 +8,6 @@ async function gasGet(params) {
   return res.json();
 }
 
-// Helper untuk POST request ke GAS (pakai text/plain agar bebas CORS preflight)
 async function gasPost(payload) {
   const res = await fetch(GAS_URL, {
     method: "POST",
@@ -19,7 +17,6 @@ async function gasPost(payload) {
   return res.json();
 }
 
-// Helper mengubah File gambar bukti TF menjadi string Base64
 export function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -29,23 +26,12 @@ export function fileToBase64(file) {
   });
 }
 
-// ==========================================
-// FUNGSI API DENZJR STORE (VERSI GAS)
-// ==========================================
 export const gasStoreApi = {
-  // 1. Ambil status toko, stok, dan daftar harga
   getStock: () => gasGet({ action: "getStock" }),
-
-  // 2. Cek status 1 pesanan berdasarkan nomor invoice
   getOrder: (orderNumber) => gasGet({ action: "getOrder", order_number: orderNumber }),
-
-  // 3. Cek riwayat pesanan berdasarkan nomor WhatsApp
   getOrdersByPhone: (phone) => gasGet({ action: "getOrdersByPhone", phone }),
-
-  // 4. Ambil semua ulasan pembeli
   getReviews: () => gasGet({ action: "getReviews" }),
 
-  // 5. Kirim pesanan baru + upload bukti transfer ke Google Drive
   createOrder: async ({ username, displayName, buyerPhone, items, total, proofFile }) => {
     const proofBase64 = proofFile ? await fileToBase64(proofFile) : "";
     return gasPost({
@@ -59,7 +45,6 @@ export const gasStoreApi = {
     });
   },
 
-  // 6. Kirim ulasan pembeli
   createReview: ({ name, rating, orderNumber, comment }) =>
     gasPost({
       action: "createReview",
@@ -69,13 +54,10 @@ export const gasStoreApi = {
       comment,
     }),
 
-  // 7. Login Admin Dashboard
   adminLogin: (pin) => gasPost({ action: "adminLogin", pin }),
-
-  // 8. Ambil semua daftar pesanan untuk Admin
   adminGetOrders: (token) => gasGet({ action: "adminOrders", token }),
+  adminGetRounds: (token) => gasGet({ action: "adminRounds", token }),
 
-  // 9. Update status pesanan (otomatis potong stok jika Selesai)
   adminUpdateStatus: (token, orderNumber, status) =>
     gasPost({
       action: "updateOrderStatus",
@@ -84,21 +66,27 @@ export const gasStoreApi = {
       status,
     }),
 
-  // 10. Hapus pesanan
   adminDeleteOrder: (token, orderNumber) =>
     gasPost({ action: "deleteOrder", token, order_number: orderNumber }),
 
-  // 11. Simpan pengaturan toko (Buka/Tutup, Stok, dan Harga)
-  adminUpdateConfig: (token, { closed, totalStock, prices }) =>
+  adminUpdateConfig: (token, { closed, totalStock, roundCapital, prices }) =>
     gasPost({
       action: "updateShopConfig",
       token,
       closed,
       total_stock: totalStock,
+      round_capital: roundCapital,
       prices,
     }),
 
-  // 12. Hapus ulasan
+  adminStartNewRound: (token, { newCapital, newStock }) =>
+    gasPost({
+      action: "startNewRound",
+      token,
+      new_capital: newCapital,
+      new_stock: newStock,
+    }),
+
   adminDeleteReview: (token, reviewId) =>
     gasPost({ action: "deleteReview", token, review_id: reviewId }),
 };
