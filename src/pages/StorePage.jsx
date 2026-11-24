@@ -62,6 +62,7 @@ export default function StorePage() {
   const [reviewOrderId, setReviewOrderId] = useState('');
   const [reviewComment, setReviewComment] = useState('');
   const [sendingReview, setSendingReview] = useState(false);
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
   useEffect(() => {
     fetchStoreData();
@@ -491,18 +492,40 @@ export default function StorePage() {
             </form>
 
             {reviews.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {reviews.map((rev) => (
-                  <div key={rev.id || rev._id} className="bg-[#121724]/95 border border-gray-800 rounded-xl p-4">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-bold text-sm text-white">{rev.name}</span>
-                      <span className="text-amber-400 text-sm">{'★'.repeat(rev.rating || 5)}</span>
-                    </div>
-                    <p className="text-gray-300 text-sm">{rev.comment}</p>
-                  </div>
-                ))}
-              </div>
-            )}
+           <div className="space-y-4">
+             <div className="flex justify-between items-center">
+               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                 Menampilkan {showAllReviews ? reviews.length : Math.min(4, reviews.length)} dari {reviews.length} ulasan
+               </p>
+             </div>
+
+             <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${showAllReviews ? 'max-h-[420px] overflow-y-auto pr-1' : ''}`}>
+               {(showAllReviews ? reviews : reviews.slice(0, 4)).map((rev, idx) => (
+                 <div key={rev.id || rev._id || idx} className="bg-[#121724]/95 border border-gray-800 rounded-xl p-4">
+                   <div className="flex justify-between items-center mb-1">
+                     <span className="font-bold text-sm text-white">{rev.name}</span>
+                     <span className="text-amber-400 text-sm">{'★'.repeat(rev.rating || 5)}</span>
+                   </div>
+                   <p className="text-gray-300 text-sm">{rev.comment}</p>
+                 </div>
+               ))}
+             </div>
+
+             {reviews.length > 4 && (
+               <div className="text-center pt-1">
+                 <button
+                   type="button"
+                   onClick={() => setShowAllReviews(!showAllReviews)}
+                   className="bg-[#151b2b] hover:bg-[#1e263d] border border-gray-700/80 text-cyan-400 font-bold text-xs px-5 py-2.5 rounded-xl transition"
+                 >
+                   {showAllReviews
+                     ? '▲ Sembunyikan Sebagian Ulasan'
+                     : `▼ Lihat Semua Ulasan (${reviews.length})`}
+                 </button>
+               </div>
+             )}
+           </div>
+         )}
           </section>
 
           <footer className="border-t border-gray-800 pt-6 flex flex-wrap justify-between text-xs text-gray-500">
