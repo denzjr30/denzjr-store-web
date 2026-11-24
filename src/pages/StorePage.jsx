@@ -26,14 +26,14 @@ const DEFAULT_PACKAGES = [
   { robux: 5000, price: 750000, badge: 'SULTAN' },
 ];
 
-// Generator No. Order unik & konsisten sebelum upload bukti TF
+// Generator No. Order unik & konsisten dengan format backend DJS-YYYYMMDD-XXXX
 const generateOrderNumber = () => {
   const now = new Date();
-  const y = now.getFullYear().toString().slice(-2);
+  const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
   const rand = Math.floor(1000 + Math.random() * 9000);
-  return `DJR-${y}${m}${d}-${rand}`;
+  return `DJS-${y}${m}${d}-${rand}`;
 };
 
 export default function StorePage() {
