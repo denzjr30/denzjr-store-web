@@ -19,7 +19,7 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [roundsData, setRoundsData] = useState([]);
-  const [currentRound, setCurrentRound] = useState(2);
+  const [currentRound, setCurrentRound] = useState(3);
   const [roundCapital, setRoundCapital] = useState('615000');
 
   const [stock, setStock] = useState('');
@@ -32,6 +32,9 @@ export default function AdminDashboard() {
   const [nextRoundCapital, setNextRoundCapital] = useState('615000');
   const [nextRoundStock, setNextRoundStock] = useState('5000');
   const [startingNewRound, setStartingNewRound] = useState(false);
+
+  // Mode tampilan kartu atas: 'active' (Putaran berjalan, auto-reset tiap restock) vs 'all' (Semua putaran)
+  const [statsScope, setStatsScope] = useState('active');
 
   const [statusFilter, setStatusFilter] = useState('Semua');
   const [roundFilter, setRoundFilter] = useState('Semua');
@@ -158,7 +161,7 @@ export default function AdminDashboard() {
       });
       if (res.error) throw new Error(res.error);
       setShowNewRoundModal(false);
-      alert(`Berhasil memulai Putaran ke-${res.new_round}!`);
+      alert(`Berhasil memulai Putaran ke-${res.new_round}! Statistik putaran otomatis di-reset ke 0.`);
       fetchAllAdminData();
     } catch (err) {
       alert(`Gagal memulai putaran baru: ${err.message}`);
@@ -217,15 +220,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Perhitungan Statistik Pesanan (Seperti Versi Sebelumnya)
-  const totalOrders = orders.length;
-  const totalOrderValue = orders.reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
-  const completedRevenue = orders
-    .filter(o => o.status === 'Selesai')
-    .reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
-  const countByStatus = (st) => orders.filter(o => o.status === st).length;
-
-  // Perhitungan Putaran Aktif
+  // Perhitungan Putaran Aktif (Otomatis reset ke 0 saat mulai putaran baru)
   const activeRoundOrders = orders.filter(o => Number(o.round || currentRound) === currentRound);
   const activeCompletedOrders = activeRoundOrders.filter(o => o.status === 'Selesai');
   const activeRoundRevenue = activeCompletedOrders.reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
@@ -233,12 +228,24 @@ export default function AdminDashboard() {
   const capitalNum = Number(roundCapital || 0);
   const activeRoundProfit = activeRoundRevenue - capitalNum;
 
-  // Perhitungan Akumulasi Seluruh Putaran (termasuk arsip Putaran 1 di Rekap_Putaran)
+  // Sumber data untuk 4 kartu pesanan atas (bisa switch antara Putaran Berjalan vs Semua Putaran)
+  const scopedOrders = statsScope === 'active' ? activeRoundOrders : orders;
+  const totalOrders = scopedOrders.length;
+  const totalOrderValue = scopedOrders.reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
+  const completedRevenue = scopedOrders
+    .filter(o => o.status === 'Selesai')
+    .reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
+  const countByStatus = (st) => scopedOrders.filter(o => o.status === st).length;
+
+  // Perhitungan Akumulasi Seluruh Putaran
   const pastRounds = roundsData.filter(r => r.round < currentRound);
   const pastRevenue = pastRounds.reduce((sum, r) => sum + Number(r.revenue || 0), 0);
   const pastProfit = pastRounds.reduce((sum, r) => sum + Number(r.profit || 0), 0);
   const allTimeRevenue = pastRevenue + activeRoundRevenue;
   const allTimeProfit = pastProfit + (activeRoundProfit > 0 ? activeRoundProfit : 0);
+
+  // Urutkan Rekap Putaran terbaru di atas agar putaran aktif selalu terlihat paling atas
+  const sortedRoundsData = [...roundsData].sort((a, b) => Number(b.round) - Number(a.round));
 
   const availableRounds = Array.from(new Set([
     ...roundsData.map(r => r.round),
@@ -306,25 +313,55 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        {/* 1. Kartu Ringkasan Pesanan Masuk & Selesai (Seperti Versi Sebelumnya) */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-gray-400 uppercase mb-1">Total Pesanan</p>
-            <p className="text-3xl font-extrabold text-orange-500">{totalOrders}</p>
-          </div>
-          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-gray-400 uppercase mb-1">Total Nilai Pesanan</p>
-            <p className="text-3xl font-extrabold text-orange-500">Rp {totalOrderValue.toLocaleString('id-ID')}</p>
-          </div>
-          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-gray-400 uppercase mb-1">Pendapatan Selesai</p>
-            <p className="text-3xl font-extrabold text-emerald-400">Rp {completedRevenue.toLocaleString('id-ID')}</p>
-          </div>
-          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-gray-400 uppercase mb-2">Per Status</p>
-            <p className="text-xs text-gray-300 leading-relaxed">
-              Menunggu konfirmasi ({countByStatus('Menunggu konfirmasi')}) • Menunggu pembayaran ({countByStatus('Menunggu pembayaran')}) • Pembayaran diterima ({countByStatus('Pembayaran diterima')}) • Selesai ({countByStatus('Selesai')})
+        {/* 1. Kartu Ringkasan Pesanan (Otomatis Reset Per Putaran Baru) */}
+        <section className="space-y-3">
+          <div className="flex flex-wrap justify-between items-center gap-2">
+            <p className="text-xs font-bold tracking-widest text-gray-400 uppercase">
+              Statistik Pesanan {statsScope === 'active' ? `(Putaran ${currentRound} • Auto-Reset)` : '(Semua Putaran Website)'}
             </p>
+            <div className="inline-flex bg-[#121724] border border-gray-800 rounded-xl p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setStatsScope('active')}
+                className={`px-3 py-1 rounded-lg font-bold transition ${statsScope === 'active' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              >
+                Putaran {currentRound}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatsScope('all')}
+                className={`px-3 py-1 rounded-lg font-bold transition ${statsScope === 'all' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              >
+                Semua Putaran ({orders.length})
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
+              <p className="text-xs text-gray-400 uppercase mb-1">
+                Total Pesanan {statsScope === 'active' ? `Putaran ${currentRound}` : ''}
+              </p>
+              <p className="text-3xl font-extrabold text-orange-500">{totalOrders}</p>
+            </div>
+            <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
+              <p className="text-xs text-gray-400 uppercase mb-1">
+                Total Nilai Pesanan {statsScope === 'active' ? `Putaran ${currentRound}` : ''}
+              </p>
+              <p className="text-3xl font-extrabold text-orange-500">Rp {totalOrderValue.toLocaleString('id-ID')}</p>
+            </div>
+            <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
+              <p className="text-xs text-gray-400 uppercase mb-1">
+                Pendapatan Selesai {statsScope === 'active' ? `Putaran ${currentRound}` : ''}
+              </p>
+              <p className="text-3xl font-extrabold text-emerald-400">Rp {completedRevenue.toLocaleString('id-ID')}</p>
+            </div>
+            <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
+              <p className="text-xs text-gray-400 uppercase mb-2">Per Status</p>
+              <p className="text-xs text-gray-300 leading-relaxed">
+                Menunggu konfirmasi ({countByStatus('Menunggu konfirmasi')}) • Menunggu pembayaran ({countByStatus('Menunggu pembayaran')}) • Pembayaran diterima ({countByStatus('Pembayaran diterima')}) • Selesai ({countByStatus('Selesai')})
+              </p>
+            </div>
           </div>
         </section>
 
@@ -365,13 +402,15 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* 3. Tabel Rekap Riwayat Per Putaran */}
-        {roundsData.length > 0 && (
+        {/* 3. Tabel Rekap Riwayat Per Putaran (Compact Scrollable + Terbaru di Atas) */}
+        {sortedRoundsData.length > 0 && (
           <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6 space-y-4">
             <div className="flex flex-wrap justify-between items-center gap-3">
               <div>
                 <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Laporan Siklus</p>
-                <h2 className="text-xl font-extrabold">Rekap Per Putaran Restock</h2>
+                <h2 className="text-xl font-extrabold">
+                  Rekap Per Putaran Restock <span className="text-xs font-normal text-gray-400">({sortedRoundsData.length} putaran)</span>
+                </h2>
               </div>
               <button
                 onClick={() => {
@@ -385,9 +424,9 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-64 overflow-y-auto pr-1">
               <table className="w-full text-left border-collapse text-sm">
-                <thead>
+                <thead className="sticky top-0 bg-[#121724] z-10">
                   <tr className="border-b border-gray-800 text-xs text-gray-400 uppercase">
                     <th className="py-2.5 px-3">Putaran</th>
                     <th className="py-2.5 px-3">Modal Restock</th>
@@ -398,7 +437,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800/60">
-                  {roundsData.map((r) => (
+                  {sortedRoundsData.map((r) => (
                     <tr key={r.round} className="hover:bg-[#161d2e]">
                       <td className="py-3 px-3 font-bold text-orange-400">Putaran {r.round}</td>
                       <td className="py-3 px-3 text-gray-300">Rp {Number(r.modal).toLocaleString('id-ID')}</td>
@@ -646,15 +685,17 @@ export default function AdminDashboard() {
           )}
         </section>
 
-        {/* 6. Moderasi Ulasan */}
+        {/* 6. Moderasi Ulasan (Compact Scrollable) */}
         <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6">
           <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Moderasi</p>
-          <h2 className="text-xl font-extrabold mb-4">Ulasan pembeli</h2>
+          <h2 className="text-xl font-extrabold mb-4">
+            Ulasan pembeli <span className="text-xs font-normal text-gray-400">({reviews.length})</span>
+          </h2>
 
           {reviews.length === 0 ? (
             <p className="text-sm text-gray-400">Belum ada ulasan masuk.</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
               {reviews.map((rev, index) => {
                 const revKey = rev.review_id || rev.id || rev._id || index;
                 return (
@@ -669,7 +710,7 @@ export default function AdminDashboard() {
                     </div>
                     <button
                       onClick={() => handleDeleteReview(rev)}
-                      className="text-red-400 hover:text-red-300 text-xs bg-red-950/60 border border-red-500/30 px-3 py-1.5 rounded-lg"
+                      className="text-red-400 hover:text-red-300 text-xs bg-red-950/60 border border-red-500/30 px-3 py-1.5 rounded-lg shrink-0"
                     >
                       Hapus
                     </button>
@@ -695,7 +736,7 @@ export default function AdminDashboard() {
               <p className="text-xs text-cyan-400 font-bold uppercase">Siklus Restock Baru</p>
               <h3 className="text-xl font-extrabold">Mulai Putaran ke-{currentRound + 1}</h3>
               <p className="text-xs text-gray-400 mt-1">
-                Putaran {currentRound} akan ditandai <strong>Selesai</strong> di rekap laporan, dan order berikutnya akan otomatis masuk ke Putaran {currentRound + 1}.
+                Putaran {currentRound} akan ditandai <strong>Selesai</strong> di rekap laporan, statistik pesanan atas di-reset ke 0, dan order berikutnya otomatis masuk ke Putaran {currentRound + 1}.
               </p>
             </div>
 
