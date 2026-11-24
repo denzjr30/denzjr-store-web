@@ -26,6 +26,16 @@ const DEFAULT_PACKAGES = [
   { robux: 5000, price: 750000, badge: 'SULTAN' },
 ];
 
+// Generator No. Order unik & konsisten sebelum upload bukti TF
+const generateOrderNumber = () => {
+  const now = new Date();
+  const y = now.getFullYear().toString().slice(-2);
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `DJR-${y}${m}${d}-${rand}`;
+};
+
 export default function StorePage() {
   const [packages, setPackages] = useState(DEFAULT_PACKAGES);
   const [totalStock, setTotalStock] = useState(null);
@@ -33,6 +43,10 @@ export default function StorePage() {
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [showQris, setShowQris] = useState(true);
+
+  // No. Order aktif yang langsung muncul sebelum upload bukti transfer
+  const [previewOrderNumber, setPreviewOrderNumber] = useState('');
+  const [copiedOrder, setCopiedOrder] = useState(false);
 
   // Data Akun Roblox (Bagian 01 & Checkout)
   const [robloxUsername, setRobloxUsername] = useState('');
@@ -52,6 +66,15 @@ export default function StorePage() {
   useEffect(() => {
     fetchStoreData();
   }, []);
+
+  // Buat No. Order otomatis saat ada item di keranjang dan belum memiliki nomor
+  useEffect(() => {
+    if (cart.length > 0 && !previewOrderNumber) {
+      setPreviewOrderNumber(generateOrderNumber());
+    } else if (cart.length === 0) {
+      setPreviewOrderNumber('');
+    }
+  }, [cart.length, previewOrderNumber]);
 
   const fetchStoreData = async () => {
     try {
@@ -106,6 +129,13 @@ export default function StorePage() {
     setCart(cart.filter(item => item.cartId !== cartId));
   };
 
+  const handleCopyOrderNumber = () => {
+    if (!previewOrderNumber) return;
+    navigator.clipboard.writeText(previewOrderNumber);
+    setCopiedOrder(true);
+    setTimeout(() => setCopiedOrder(false), 2000);
+  };
+
   const totalRobux = cart.reduce((sum, item) => sum + item.robux, 0);
   const totalPrice = cart.reduce((sum, item) => sum + item.price, 0);
 
@@ -138,6 +168,8 @@ export default function StorePage() {
     if (!robloxUsername.trim()) return alert("Masukkan username Roblox kamu terlebih dahulu!");
     if (!paymentProof) return alert("Pilih gambar bukti transfer terlebih dahulu!");
 
+    const activeOrderNo = previewOrderNumber || generateOrderNumber();
+
     setSubmitting(true);
     try {
       const proofDataUrl = await fileToCompressedDataUrl(paymentProof);
@@ -149,7 +181,7 @@ export default function StorePage() {
         subtotal: Number(item.price)
       }));
 
-      // Kirim ke Google Apps Script (otomatis simpan bukti TF ke Drive & catat di Sheets)
+      // Kirim ke Google Apps Script (menyertakan order_number yang sudah tampil di layar)
       const res = await fetch(
         process.env.REACT_APP_GAS_URL || (await import('../gasApi')).GAS_URL,
         {
@@ -157,6 +189,7 @@ export default function StorePage() {
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({
             action: 'createOrder',
+            order_number: activeOrderNo,
             username: robloxUsername.trim(),
             display_name: (displayName || robloxUsername).trim(),
             buyer_phone: whatsapp.trim(),
@@ -170,7 +203,7 @@ export default function StorePage() {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
-      const orderCode = data.order_number;
+      const finalOrderCode = data.order_number || activeOrderNo;
       const proofDriveLink = data.proof_url || '-';
 
       const detailItemsText = cart
@@ -181,7 +214,7 @@ export default function StorePage() {
         `Halo Admin DenzJr Store! 👋 Saya mau pesan & bayar Robux via QRIS dengan detail berikut:\n\n` +
         `📋 INFORMASI PESANAN\n` +
         `------------------------------------\n` +
-        `• No. Order : ${orderCode}\n` +
+        `• No. Order : ${finalOrderCode}\n` +
         `• Username : ${robloxUsername.trim()}\n` +
         `• Display Name : ${displayName.trim() || '-'}\n` +
         `• No. WhatsApp : ${whatsapp.trim()}\n\n` +
@@ -193,9 +226,14 @@ export default function StorePage() {
         `------------------------------------\n\n` +
         `Mohon dicek bukti transfer yang saya lampirkan di chat ini dan segera diproses ya Admin, terima kasih! 🙏`;
 
+      // Reset keranjang & seluruh form Data Akun Roblox otomatis
       setCart([]);
       setIsCartOpen(false);
       setPaymentProof(null);
+      setRobloxUsername('');
+      setDisplayName('');
+      setWhatsapp('');
+      setPreviewOrderNumber('');
       fetchStoreData();
 
       window.open(`https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(waMessage)}`, '_blank');
@@ -527,8 +565,19 @@ export default function StorePage() {
                   <span className="text-2xl font-extrabold text-orange-500">Rp {totalPrice.toLocaleString('id-ID')}</span>
                 </div>
 
-                <div className="bg-[#151e33] border border-blue-500/30 rounded-xl p-3 text-xs text-gray-300 mb-3">
-                  No. Order kamu: <span className="text-cyan-400 font-bold">Dibuat otomatis saat kirim bukti</span>
+                {/* NO. ORDER LANGSUNG MUNCUL SEBELUM UPLOAD BUKTI TF */}
+                <div className="bg-[#151e33] border border-blue-500/30 rounded-xl p-3 text-xs text-gray-300 mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-gray-400 block text-[11px]">No. Order kamu (simpan / cantumkan di catatan TF):</span>
+                    <span className="text-cyan-400 font-extrabold text-sm tracking-wide">{previewOrderNumber}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyOrderNumber}
+                    className="bg-blue-600/30 hover:bg-blue-600/50 border border-blue-400/40 text-cyan-300 font-bold px-3 py-1.5 rounded-lg text-[11px] transition shrink-0"
+                  >
+                    {copiedOrder ? '✓ Tersalin' : 'Salin'}
+                  </button>
                 </div>
 
                 <button
