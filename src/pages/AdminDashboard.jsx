@@ -2,843 +2,850 @@ import React, { useState, useEffect } from 'react';
 import { gasStoreApi } from '../gasApi';
 import { Link } from 'react-router-dom';
 
-const NOMINAL_LIST = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000, 4000, 5000];
+const ADMIN_WHATSAPP = "6281958085966";
 
-const DEFAULT_PRICES = {
-  10: 2000, 20: 3500, 30: 5000, 40: 6500, 50: 8000,
-  60: 9500, 70: 11000, 80: 12500, 90: 14000, 100: 15500,
-  200: 31000, 300: 46500, 400: 62000, 500: 77500, 1000: 155000,
-  2000: 310000, 3000: 465000, 4000: 620000, 5000: 750000
+const DEFAULT_PACKAGES = [
+  { robux: 10, price: 2000, badge: 'KELIPATAN 10' },
+  { robux: 20, price: 3500 },
+  { robux: 30, price: 5000 },
+  { robux: 40, price: 6500 },
+  { robux: 50, price: 8000 },
+  { robux: 60, price: 9500 },
+  { robux: 70, price: 11000 },
+  { robux: 80, price: 12500 },
+  { robux: 90, price: 14000 },
+  { robux: 100, price: 15500, badge: 'KELIPATAN 100' },
+  { robux: 200, price: 31000 },
+  { robux: 300, price: 46500 },
+  { robux: 400, price: 62000 },
+  { robux: 500, price: 77500 },
+  { robux: 1000, price: 155000, badge: 'FAVORIT' },
+  { robux: 2000, price: 310000 },
+  { robux: 3000, price: 465000 },
+  { robux: 4000, price: 620000 },
+  { robux: 5000, price: 750000, badge: 'SULTAN' },
+];
+
+// Generator No. Order unik & konsisten dengan format backend DJS-YYYYMMDD-XXXX
+const generateOrderNumber = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `DJS-${y}${m}${d}-${rand}`;
 };
 
-// Helper kirim sinyal sinkronisasi instan (0 detik) ke tab StorePage
-const notifyStoreSync = (payload) => {
-  if (typeof BroadcastChannel !== 'undefined') {
-    const channel = new BroadcastChannel('denzjr_store_sync');
-    channel.postMessage(payload);
-    channel.close();
-  }
-};
-
-export default function AdminDashboard() {
-  const [pin, setPin] = useState('');
-  const [token, setToken] = useState(localStorage.getItem('admin_token_gas') || '');
-  const [authError, setAuthError] = useState('');
-
-  const [orders, setOrders] = useState([]);
-  const [reviews, setReviews] = useState([]);
-  const [roundsData, setRoundsData] = useState([]);
-  const [currentRound, setCurrentRound] = useState(3);
-  const [roundCapital, setRoundCapital] = useState('615000');
-
-  const [stock, setStock] = useState('');
+export default function StorePage() {
+  const [packages, setPackages] = useState(DEFAULT_PACKAGES);
+  const [totalStock, setTotalStock] = useState(null);
   const [isOpen, setIsOpen] = useState(true);
-  const [prices, setPrices] = useState(DEFAULT_PRICES);
-  const [savingSettings, setSavingSettings] = useState(false);
-  const [previewProof, setPreviewProof] = useState(null);
+  const [cart, setCart] = useState([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [showQris, setShowQris] = useState(true);
 
-  const [showNewRoundModal, setShowNewRoundModal] = useState(false);
-  const [nextRoundCapital, setNextRoundCapital] = useState('615000');
-  const [nextRoundStock, setNextRoundStock] = useState('5000');
-  const [startingNewRound, setStartingNewRound] = useState(false);
+  // Modal Info (Cara Order & S&K)
+  const [infoModal, setInfoModal] = useState(null); // 'howto' | 'terms' | null
 
-  // Mode tampilan kartu atas: 'active' (Putaran berjalan, auto-reset tiap restock) vs 'all' (Semua putaran)
-  const [statsScope, setStatsScope] = useState('active');
+  // No. Order aktif yang langsung muncul sebelum upload bukti transfer
+  const [previewOrderNumber, setPreviewOrderNumber] = useState('');
+  const [copiedOrder, setCopiedOrder] = useState(false);
 
-  const [statusFilter, setStatusFilter] = useState('Semua');
-  const [roundFilter, setRoundFilter] = useState('Semua');
-  const [sortOrder, setSortOrder] = useState('newest');
+  // Data Akun Roblox (Bagian 01 & Checkout)
+  const [robloxUsername, setRobloxUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [paymentProof, setPaymentProof] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (token) {
-      fetchAllAdminData();
-    }
-  }, [token]);
+  // Ulasan
+  const [reviews, setReviews] = useState([]);
+  const [rating, setRating] = useState(5);
+  const [reviewName, setReviewName] = useState('');
+  const [reviewOrderId, setReviewOrderId] = useState('');
+  const [reviewComment, setReviewComment] = useState('');
+  const [sendingReview, setSendingReview] = useState(false);
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setAuthError('');
+  const fetchStoreData = async () => {
     try {
-      const res = await gasStoreApi.adminLogin(pin);
-      if (res.error || !res.token) {
-        setAuthError(res.error || 'PIN Admin tidak valid!');
-        return;
-      }
-      setToken(res.token);
-      localStorage.setItem('admin_token_gas', res.token);
-    } catch (err) {
-      setAuthError('Gagal terhubung ke server Google Apps Script!');
-    }
-  };
-
-  const fetchAllAdminData = async () => {
-    try {
-      const [ordRes, shopRes, revRes, rndRes] = await Promise.allSettled([
-        gasStoreApi.adminGetOrders(token),
+      const [shopRes, reviewsRes] = await Promise.allSettled([
         gasStoreApi.getStock(),
-        gasStoreApi.getReviews(),
-        gasStoreApi.adminGetRounds(token)
+        gasStoreApi.getReviews()
       ]);
 
-      if (ordRes.status === 'fulfilled' && ordRes.value) {
-        if (ordRes.value.error === 'Unauthorized') {
-          setToken('');
-          localStorage.removeItem('admin_token_gas');
-          return;
-        }
-        const rawOrders = Array.isArray(ordRes.value)
-          ? ordRes.value
-          : (Array.isArray(ordRes.value.orders) ? ordRes.value.orders : []);
-        setOrders(rawOrders);
-      }
-
-      if (revRes.status === 'fulfilled' && revRes.value) {
-        const rawReviews = Array.isArray(revRes.value)
-          ? revRes.value
-          : (Array.isArray(revRes.value.reviews) ? revRes.value.reviews : []);
-        setReviews(rawReviews);
-      }
-
-      if (rndRes.status === 'fulfilled' && rndRes.value && Array.isArray(rndRes.value.rounds)) {
-        setRoundsData(rndRes.value.rounds);
-      }
-
       if (shopRes.status === 'fulfilled' && shopRes.value) {
-        const s = shopRes.value;
-        const rawStock = s.total_stock;
-        setStock(rawStock !== null && rawStock !== undefined && rawStock !== '' ? String(rawStock) : '');
-        setIsOpen(s.closed !== undefined ? !s.closed : (s.is_open !== undefined ? s.is_open : true));
-        if (s.current_round) setCurrentRound(Number(s.current_round));
-        if (s.round_capital !== undefined) setRoundCapital(String(s.round_capital));
+        const data = shopRes.value;
 
-        if (s.prices && typeof s.prices === 'object') {
-          setPrices({ ...DEFAULT_PRICES, ...s.prices });
+        if (data.total_stock !== null && data.total_stock !== undefined && !Number.isNaN(Number(data.total_stock))) {
+          setTotalStock(Number(data.total_stock));
+        } else {
+          setTotalStock(null);
+        }
+
+        if (data.closed !== undefined) {
+          setIsOpen(!data.closed);
+        } else if (data.is_open !== undefined) {
+          setIsOpen(data.is_open);
+        }
+
+        if (data.prices && typeof data.prices === 'object' && Object.keys(data.prices).length > 0) {
+          const updated = DEFAULT_PACKAGES.map(pkg => ({
+            ...pkg,
+            price: data.prices[pkg.robux] ? Number(data.prices[pkg.robux]) : pkg.price
+          }));
+          setPackages(updated);
         }
       }
-    } catch (err) {
-      console.error('Gagal memuat data admin:', err);
-    }
-  };
 
-  const handleToggleShopStatus = async () => {
-    const nextOpenState = !isOpen;
-    try {
-      const res = await gasStoreApi.adminUpdateConfig(token, {
-        closed: !nextOpenState
-      });
-      if (res.error) throw new Error(res.error);
-      setIsOpen(nextOpenState);
-      notifyStoreSync({ type: 'SHOP_STATUS_CHANGED', isOpen: nextOpenState });
-      alert(nextOpenState ? 'Status toko diubah menjadi BUKA!' : 'Status toko diubah menjadi TUTUP sementara!');
-    } catch (err) {
-      alert('Gagal mengubah status buka/tutup toko.');
-    }
-  };
-
-  const handleSaveSettings = async () => {
-    setSavingSettings(true);
-    try {
-      const stockValue = stock === '' ? null : Number(stock);
-      const formattedPrices = {};
-      NOMINAL_LIST.forEach((nom) => {
-        formattedPrices[String(nom)] = Number(prices[nom] || DEFAULT_PRICES[nom]);
-      });
-
-      const res = await gasStoreApi.adminUpdateConfig(token, {
-        closed: !isOpen,
-        totalStock: stockValue,
-        roundCapital: Number(roundCapital || 0),
-        prices: formattedPrices
-      });
-      if (res.error) throw new Error(res.error);
-
-      notifyStoreSync({ type: 'STORE_DATA_UPDATED' });
-      alert('Perubahan stok, modal putaran & seluruh harga berhasil disimpan ke Google Sheets!');
-      fetchAllAdminData();
-    } catch (err) {
-      alert(`Gagal menyimpan: ${err.message}`);
-    } finally {
-      setSavingSettings(false);
-    }
-  };
-
-  const handleStartNewRound = async (e) => {
-    e.preventDefault();
-    setStartingNewRound(true);
-    try {
-      const res = await gasStoreApi.adminStartNewRound(token, {
-        newCapital: Number(nextRoundCapital || 0),
-        newStock: nextRoundStock === '' ? 5000 : Number(nextRoundStock)
-      });
-      if (res.error) throw new Error(res.error);
-      setShowNewRoundModal(false);
-      notifyStoreSync({ type: 'STORE_DATA_UPDATED' });
-      alert(`Berhasil memulai Putaran ke-${res.new_round}! Statistik putaran otomatis di-reset ke 0.`);
-      fetchAllAdminData();
-    } catch (err) {
-      alert(`Gagal memulai putaran baru: ${err.message}`);
-    } finally {
-      setStartingNewRound(false);
-    }
-  };
-
-  const handleStatusChange = async (orderNumber, newStatus) => {
-    try {
-      const res = await gasStoreApi.adminUpdateStatus(token, orderNumber, newStatus);
-      if (res.error) throw new Error(res.error);
-      if (newStatus === 'Selesai') {
-        notifyStoreSync({ type: 'STORE_DATA_UPDATED' });
+      if (reviewsRes.status === 'fulfilled' && reviewsRes.value) {
+        const list = Array.isArray(reviewsRes.value) ? reviewsRes.value : (reviewsRes.value.reviews || []);
+        setReviews(list);
       }
-      fetchAllAdminData();
     } catch (err) {
-      alert('Gagal mengubah status pesanan.');
+      console.error("Gagal memuat pengaturan toko", err);
     }
   };
 
-  const handleDeleteOrder = async (orderNumber) => {
-    if (!window.confirm(`Hapus pesanan ${orderNumber} secara permanen?`)) return;
+  // Auto-sync status Buka/Tutup Toko, Stok, & Harga tanpa refresh halaman
+  useEffect(() => {
+    fetchStoreData();
+
+    const syncInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchStoreData();
+      }
+    }, 3000);
+
+    let channel = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      channel = new BroadcastChannel('denzjr_store_sync');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'SHOP_STATUS_CHANGED') {
+          setIsOpen(Boolean(event.data.isOpen));
+          fetchStoreData();
+        } else if (event.data?.type === 'STORE_DATA_UPDATED') {
+          fetchStoreData();
+        }
+      };
+    }
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetchStoreData();
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(syncInterval);
+      if (channel) channel.close();
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
+  }, []);
+
+  // Buat No. Order otomatis saat ada item di keranjang dan belum memiliki nomor
+  useEffect(() => {
+    if (cart.length > 0 && !previewOrderNumber) {
+      setPreviewOrderNumber(generateOrderNumber());
+    } else if (cart.length === 0) {
+      setPreviewOrderNumber('');
+    }
+  }, [cart.length, previewOrderNumber]);
+
+  const addToCart = (pkg) => {
+    if (!isOpen) return alert("Maaf, toko sedang tutup sementara.");
+    const currentRobuxInCart = cart.reduce((sum, item) => sum + item.robux, 0);
+    if (totalStock !== null && totalStock !== "" && currentRobuxInCart + pkg.robux > Number(totalStock)) {
+      return alert(`Stok Robux tidak mencukupi (tersedia ${Number(totalStock).toLocaleString('id-ID')} R$).`);
+    }
+    setCart([...cart, { ...pkg, cartId: Date.now() + Math.random() }]);
+  };
+
+  const removeFromCart = (cartId) => {
+    setCart(cart.filter(item => item.cartId !== cartId));
+  };
+
+  const handleCopyOrderNumber = () => {
+    if (!previewOrderNumber) return;
+    navigator.clipboard.writeText(previewOrderNumber);
+    setCopiedOrder(true);
+    setTimeout(() => setCopiedOrder(false), 2000);
+  };
+
+  const totalRobux = cart.reduce((sum, item) => sum + item.robux, 0);
+  const totalPrice = cart.reduce((sum, item) => sum + item.price, 0);
+
+  const fileToCompressedDataUrl = (file) =>
+    new Promise((resolve) => {
+      if (!file) return resolve('');
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxW = 800;
+          const scale = img.width > maxW ? maxW / img.width : 1;
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        };
+        img.onerror = () => resolve('');
+        img.src = event.target.result;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+
+  const handleCheckoutSubmit = async (e) => {
+    e.preventDefault();
+    if (cart.length === 0) return alert("Keranjang masih kosong!");
+    if (!robloxUsername.trim()) return alert("Masukkan username Roblox kamu terlebih dahulu!");
+    if (!paymentProof) return alert("Pilih gambar bukti transfer terlebih dahulu!");
+
+    const activeOrderNo = previewOrderNumber || generateOrderNumber();
+
+    setSubmitting(true);
     try {
-      const res = await gasStoreApi.adminDeleteOrder(token, orderNumber);
-      if (res.error) throw new Error(res.error);
-      fetchAllAdminData();
+      const proofDataUrl = await fileToCompressedDataUrl(paymentProof);
+
+      const orderItems = cart.map((item) => ({
+        robux: Number(item.robux),
+        qty: 1,
+        price: Number(item.price),
+        subtotal: Number(item.price)
+      }));
+
+      const res = await fetch(
+        process.env.REACT_APP_GAS_URL || (await import('../gasApi')).GAS_URL,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'createOrder',
+            order_number: activeOrderNo,
+            username: robloxUsername.trim(),
+            display_name: (displayName || robloxUsername).trim(),
+            buyer_phone: whatsapp.trim(),
+            items: orderItems,
+            total: Number(totalPrice),
+            proof_base64: proofDataUrl
+          })
+        }
+      );
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      const finalOrderCode = data.order_number || activeOrderNo;
+      const proofDriveLink = data.proof_url || '-';
+
+      const detailItemsText = cart
+        .map(item => `• ${item.robux.toLocaleString('id-ID')} Robux - Rp ${item.price.toLocaleString('id-ID')}`)
+        .join('\n');
+
+      const waMessage = 
+        `Halo Admin DenzJr Store! 👋 Saya mau pesan & bayar Robux via QRIS dengan detail berikut:\n\n` +
+        `📋 INFORMASI PESANAN\n` +
+        `------------------------------------\n` +
+        `• No. Order : ${finalOrderCode}\n` +
+        `• Username : ${robloxUsername.trim()}\n` +
+        `• Display Name : ${displayName.trim() || '-'}\n` +
+        `• No. WhatsApp : ${whatsapp.trim()}\n\n` +
+        `🛒 DETAIL ITEM\n` +
+        `------------------------------------\n` +
+        `${detailItemsText}\n\n` +
+        `💎 TOTAL ROBUX : ${totalRobux.toLocaleString('id-ID')} R$\n` +
+        `💰 TOTAL PEMBAYARAN : Rp ${totalPrice.toLocaleString('id-ID')}\n` +
+        `🧾 Bukti TF : ${proofDriveLink}\n` +
+        `------------------------------------\n\n` +
+        `Mohon dicek bukti transfer yang saya lampirkan di chat ini dan segera diproses ya Admin, terima kasih! 🙏`;
+
+      setCart([]);
+      setIsCartOpen(false);
+      setPaymentProof(null);
+      setRobloxUsername('');
+      setDisplayName('');
+      setWhatsapp('');
+      setPreviewOrderNumber('');
+      fetchStoreData();
+
+      window.open(`https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(waMessage)}`, '_blank');
     } catch (err) {
-      alert('Gagal menghapus pesanan.');
+      alert(`Gagal mengirim pesanan: ${err.message}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDeleteReview = async (rev) => {
-    const revId = rev.review_id || rev.id || rev._id;
-    if (!revId) {
-      alert('ID ulasan tidak ditemukan.');
-      return;
-    }
-    if (!window.confirm('Hapus ulasan ini?')) return;
+  const handleSendReview = async (e) => {
+    e.preventDefault();
+    if (!reviewComment.trim()) return alert("Tuliskan pengalaman top up kamu terlebih dahulu.");
+    setSendingReview(true);
     try {
-      const res = await gasStoreApi.adminDeleteReview(token, revId);
-      if (res.error) throw new Error(res.error);
-      notifyStoreSync({ type: 'STORE_DATA_UPDATED' });
-      fetchAllAdminData();
+      const data = await gasStoreApi.createReview({
+        rating,
+        name: reviewName.trim() || "Pembeli Anonim",
+        orderNumber: reviewOrderId.trim(),
+        comment: reviewComment.trim()
+      });
+      if (data.error) throw new Error(data.error);
+
+      setReviewName('');
+      setReviewOrderId('');
+      setReviewComment('');
+      setRating(5);
+      fetchStoreData();
+      alert("Terima kasih! Ulasan kamu berhasil dikirim.");
     } catch (err) {
-      alert(`Gagal menghapus ulasan: ${err.message}`);
+      alert("Gagal mengirim ulasan.");
+    } finally {
+      setSendingReview(false);
     }
   };
-
-  const formatHistoryDate = (isoStr) => {
-    if (!isoStr) return '';
-    try {
-      const d = new Date(isoStr);
-      if (Number.isNaN(d.getTime())) return isoStr;
-      const day = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
-      const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(':', '.');
-      return `${day}, ${time}`;
-    } catch {
-      return isoStr;
-    }
-  };
-
-  // Perhitungan Putaran Aktif (Otomatis reset ke 0 saat mulai putaran baru)
-  const activeRoundOrders = orders.filter(o => Number(o.round || currentRound) === currentRound);
-  const activeCompletedOrders = activeRoundOrders.filter(o => o.status === 'Selesai');
-  const activeRoundRevenue = activeCompletedOrders.reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
-  const activeRoundRobuxSold = activeCompletedOrders.reduce((sum, o) => sum + (Number(o.total_robux) || 0), 0);
-  const capitalNum = Number(roundCapital || 0);
-  const activeRoundProfit = activeRoundRevenue - capitalNum;
-
-  // Sumber data untuk 4 kartu pesanan atas (bisa switch antara Putaran Berjalan vs Semua Putaran)
-  const scopedOrders = statsScope === 'active' ? activeRoundOrders : orders;
-  const totalOrders = scopedOrders.length;
-  const totalOrderValue = scopedOrders.reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
-  const completedRevenue = scopedOrders
-    .filter(o => o.status === 'Selesai')
-    .reduce((sum, o) => sum + (Number(o.total ?? o.total_price) || 0), 0);
-  const countByStatus = (st) => scopedOrders.filter(o => o.status === st).length;
-
-  // Perhitungan Akumulasi Seluruh Putaran
-  const pastRounds = roundsData.filter(r => r.round < currentRound);
-  const pastRevenue = pastRounds.reduce((sum, r) => sum + Number(r.revenue || 0), 0);
-  const pastProfit = pastRounds.reduce((sum, r) => sum + Number(r.profit || 0), 0);
-  const allTimeRevenue = pastRevenue + activeRoundRevenue;
-  const allTimeProfit = pastProfit + (activeRoundProfit > 0 ? activeRoundProfit : 0);
-
-  // Urutkan Rekap Putaran terbaru di atas agar putaran aktif selalu terlihat paling atas
-  const sortedRoundsData = [...roundsData].sort((a, b) => Number(b.round) - Number(a.round));
-
-  const availableRounds = Array.from(new Set([
-    ...roundsData.map(r => r.round),
-    ...orders.map(o => Number(o.round || currentRound)),
-    currentRound
-  ])).sort((a, b) => b - a);
-
-  const filteredOrders = orders
-    .filter(o => statusFilter === 'Semua' || o.status === statusFilter)
-    .filter(o => roundFilter === 'Semua' || String(o.round || currentRound) === String(roundFilter))
-    .sort((a, b) => sortOrder === 'newest' ? 0 : -1);
-
-  if (!token) {
-    return (
-      <div className="min-h-screen bg-[#0b0f19] text-white flex items-center justify-center p-4">
-        <div className="bg-[#121724] border border-gray-800 p-7 rounded-2xl max-w-sm w-full shadow-xl text-center">
-          <img src="/logo.jpeg" alt="Admin" className="w-14 h-14 rounded-xl mx-auto mb-3 object-cover" />
-          <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">DenzJr Store / Admin</p>
-          <h1 className="text-2xl font-extrabold mb-5">Masuk Dashboard</h1>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input
-              type="password"
-              required
-              value={pin}
-              onChange={e => setPin(e.target.value)}
-              placeholder="Masukkan ADMIN_PIN"
-              className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-center text-white tracking-widest focus:border-orange-500 outline-none"
-            />
-            {authError && <p className="text-red-400 text-xs">{authError}</p>}
-            <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 font-bold py-3 rounded-xl transition">
-              Buka Dashboard
-            </button>
-          </form>
-          <div className="mt-5">
-            <Link to="/" className="text-xs text-gray-400 hover:underline">← Kembali ke Store</Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-white font-sans p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <header className="flex flex-wrap justify-between items-center gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">DenzJr Store / Admin</p>
-              <span className="bg-orange-500/20 border border-orange-500/40 text-orange-400 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-                Putaran ke-{currentRound}
-              </span>
+    <div className="min-h-screen text-white font-sans pb-28 relative overflow-x-hidden bg-[#060812]">
+      {/* ANIMASI LIVE WALLPAPER CSS */}
+      <style>{`
+        @keyframes denzjrLiveBg {
+          0%, 100% {
+            transform: scale(1.03) translateY(0px);
+            filter: brightness(0.95) saturate(1.1);
+          }
+          50% {
+            transform: scale(1.09) translateY(-10px);
+            filter: brightness(1.12) saturate(1.3);
+          }
+        }
+        @keyframes neonOrbFloat {
+          0%, 100% {
+            transform: translateY(0px) scale(1);
+            opacity: 0.35;
+          }
+          50% {
+            transform: translateY(-28px) scale(1.15);
+            opacity: 0.75;
+          }
+        }
+        .live-wallpaper-layer {
+          animation: denzjrLiveBg 12s ease-in-out infinite;
+        }
+        .neon-orb-cyan {
+          animation: neonOrbFloat 7s ease-in-out infinite;
+        }
+        .neon-orb-purple {
+          animation: neonOrbFloat 9s ease-in-out infinite reverse;
+        }
+      `}</style>
+
+      {/* LAYER 1: GAMBAR LIVE BACKGROUND (bg-denzjr.jpeg) */}
+      <div
+        className="fixed inset-0 bg-cover bg-center pointer-events-none z-0 live-wallpaper-layer"
+        style={{ backgroundImage: "url('/bg-denzjr.jpeg')" }}
+      />
+
+      {/* LAYER 2: PARTIKEL CAHAYA NEON MELAYANG */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="neon-orb-cyan absolute top-24 left-8 w-44 h-44 rounded-full bg-cyan-500/20 blur-3xl" />
+        <div className="neon-orb-purple absolute bottom-32 right-8 w-52 h-52 rounded-full bg-purple-600/25 blur-3xl" />
+        <div className="neon-orb-cyan absolute top-1/2 left-1/3 w-36 h-36 rounded-full bg-blue-500/15 blur-3xl" />
+      </div>
+
+      {/* LAYER 3: VIGNETTE GELAP TENGAH AGAR TEKS TAJAM TERBACA */}
+      <div className="fixed inset-0 bg-gradient-to-b from-[#060913]/65 via-[#070b17]/75 to-[#050811]/85 pointer-events-none z-0" />
+
+      {/* KONTEN UTAMA */}
+      <div className="relative z-10">
+        {/* HEADER */}
+        <header className="sticky top-0 z-30 bg-[#090d1a]/80 backdrop-blur-md border-b border-cyan-500/20 shadow-[0_4px_25px_rgba(6,182,212,0.08)]">
+          <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <img src="/logo.jpeg" alt="DenzJr Store" className="w-11 h-11 rounded-xl object-cover border border-cyan-400/60 shadow-[0_0_15px_rgba(6,182,212,0.35)]" />
+                <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-[#090d1a] ${isOpen ? 'bg-emerald-400' : 'bg-red-500'}`} />
+              </div>
+              <div>
+                <h1 className="text-xl font-extrabold tracking-wide">
+                  DENZJR <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-500">STORE</span>
+                </h1>
+                <p className="text-[11px] tracking-widest text-cyan-300/80 uppercase">Roblox Top Up Center</p>
+              </div>
             </div>
-            <h1 className="text-3xl font-extrabold">Dashboard & Siklus Restock</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link to="/" className="bg-[#121724] border border-gray-800 px-4 py-2 rounded-xl text-sm text-gray-300 hover:text-white">
-              Lihat Toko
-            </Link>
-            <button onClick={fetchAllAdminData} className="bg-orange-600 hover:bg-orange-500 px-4 py-2 rounded-xl text-sm font-bold transition">
-              ↻ Segarkan
-            </button>
-            <button onClick={() => { setToken(''); localStorage.removeItem('admin_token_gas'); }} className="bg-red-950/60 border border-red-500/40 text-red-400 px-3 py-2 rounded-xl text-sm">
-              Keluar
-            </button>
+
+            <div className="flex items-center gap-2.5">
+              <Link to="/status" className="bg-[#131a2e]/85 hover:bg-[#1b2542] border border-cyan-500/30 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 shadow-sm">
+                <span>📦</span> Cek Status
+              </Link>
+              <a 
+                href={`https://wa.me/${ADMIN_WHATSAPP}`} 
+                target="_blank" 
+                rel="noreferrer"
+                className="bg-[#102624]/85 hover:bg-[#153532] border border-emerald-500/40 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 text-emerald-400 shadow-sm"
+              >
+                <span>💬</span> Admin
+              </a>
+            </div>
           </div>
         </header>
 
-        {/* 1. Kartu Ringkasan Pesanan (Otomatis Reset Per Putaran Baru) */}
-        <section className="space-y-3">
-          <div className="flex flex-wrap justify-between items-center gap-2">
-            <p className="text-xs font-bold tracking-widest text-gray-400 uppercase">
-              Statistik Pesanan {statsScope === 'active' ? `(Putaran ${currentRound} • Auto-Reset)` : '(Semua Putaran Website)'}
-            </p>
-            <div className="inline-flex bg-[#121724] border border-gray-800 rounded-xl p-1 text-xs">
-              <button
-                type="button"
-                onClick={() => setStatsScope('active')}
-                className={`px-3 py-1 rounded-lg font-bold transition ${statsScope === 'active' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}
-              >
-                Putaran {currentRound}
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatsScope('all')}
-                className={`px-3 py-1 rounded-lg font-bold transition ${statsScope === 'all' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}
-              >
-                Semua Putaran ({orders.length})
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-              <p className="text-xs text-gray-400 uppercase mb-1">
-                Total Pesanan {statsScope === 'active' ? `Putaran ${currentRound}` : ''}
-              </p>
-              <p className="text-3xl font-extrabold text-orange-500">{totalOrders}</p>
-            </div>
-            <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-              <p className="text-xs text-gray-400 uppercase mb-1">
-                Total Nilai Pesanan {statsScope === 'active' ? `Putaran ${currentRound}` : ''}
-              </p>
-              <p className="text-3xl font-extrabold text-orange-500">Rp {totalOrderValue.toLocaleString('id-ID')}</p>
-            </div>
-            <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-              <p className="text-xs text-gray-400 uppercase mb-1">
-                Pendapatan Selesai {statsScope === 'active' ? `Putaran ${currentRound}` : ''}
-              </p>
-              <p className="text-3xl font-extrabold text-emerald-400">Rp {completedRevenue.toLocaleString('id-ID')}</p>
-            </div>
-            <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-              <p className="text-xs text-gray-400 uppercase mb-2">Per Status</p>
-              <p className="text-xs text-gray-300 leading-relaxed">
-                Menunggu konfirmasi ({countByStatus('Menunggu konfirmasi')}) • Menunggu pembayaran ({countByStatus('Menunggu pembayaran')}) • Pembayaran diterima ({countByStatus('Pembayaran diterima')}) • Selesai ({countByStatus('Selesai')})
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* 2. Kartu Ringkasan Keuangan Putaran Aktif & Total Akumulasi */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-cyan-400 font-bold uppercase mb-1">Omzet Putaran {currentRound}</p>
-            <p className="text-2xl font-extrabold text-white">Rp {activeRoundRevenue.toLocaleString('id-ID')}</p>
-            <p className="text-xs text-gray-400 mt-1">{activeRoundRobuxSold.toLocaleString('id-ID')} R$ terjual ({activeCompletedOrders.length} selesai)</p>
-          </div>
-
-          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-gray-400 font-bold uppercase mb-1">Modal Putaran {currentRound}</p>
-            <p className="text-2xl font-extrabold text-orange-400">Rp {capitalNum.toLocaleString('id-ID')}</p>
-            <p className="text-xs text-gray-400 mt-1">
-              {activeRoundRevenue >= capitalNum
-                ? '✅ Modal sudah balik (BEP)'
-                : `Kurang Rp ${(capitalNum - activeRoundRevenue).toLocaleString('id-ID')} untuk BEP`}
-            </p>
-          </div>
-
-          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-gray-400 font-bold uppercase mb-1">Laba Bersih Putaran {currentRound}</p>
-            <p className={`text-2xl font-extrabold ${activeRoundProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {activeRoundProfit >= 0 ? '+' : ''}Rp {activeRoundProfit.toLocaleString('id-ID')}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">Omzet kotor dikurangi modal</p>
-          </div>
-
-          <div className="bg-[#121724] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-amber-400 font-bold uppercase mb-1">Total Semua Putaran</p>
-            <p className="text-2xl font-extrabold text-emerald-400">Rp {allTimeRevenue.toLocaleString('id-ID')}</p>
-            <p className="text-xs text-gray-300 mt-1">
-              Total Laba: <span className={allTimeProfit >= 0 ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
-                Rp {allTimeProfit.toLocaleString('id-ID')}
-              </span>
-            </p>
-          </div>
-        </section>
-
-        {/* 3. Tabel Rekap Riwayat Per Putaran (Compact Scrollable + Terbaru di Atas) */}
-        {sortedRoundsData.length > 0 && (
-          <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6 space-y-4">
-            <div className="flex flex-wrap justify-between items-center gap-3">
-              <div>
-                <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Laporan Siklus</p>
-                <h2 className="text-xl font-extrabold">
-                  Rekap Per Putaran Restock <span className="text-xs font-normal text-gray-400">({sortedRoundsData.length} putaran)</span>
-                </h2>
+        <main className="max-w-6xl mx-auto px-4 pt-6">
+          {/* HERO BANNER DENGAN TOMBOL CARA ORDER & S&K */}
+          <div className="bg-gradient-to-br from-[#0e1528]/85 via-[#11172b]/85 to-[#16122c]/85 backdrop-blur-md border border-cyan-500/30 rounded-2xl p-6 md:p-9 mb-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_0_35px_rgba(6,182,212,0.12)]">
+            <div className="max-w-xl">
+              <div className="inline-flex items-center gap-2 bg-cyan-500/10 border border-cyan-400/30 px-3 py-1 rounded-full mb-3">
+                <span className="text-xs font-bold tracking-wider text-cyan-300 uppercase">✨ Top Up Robux Aman & Cepat</span>
               </div>
-              <button
-                onClick={() => {
-                  setNextRoundCapital(roundCapital || '615000');
-                  setNextRoundStock('5000');
-                  setShowNewRoundModal(true);
-                }}
-                className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition"
-              >
-                🔄 Mulai Putaran Baru (Restock)
-              </button>
-            </div>
+              <h2 className="text-3xl md:text-4xl font-extrabold leading-tight mb-3">
+                Level up your <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-400 to-cyan-400">Roblox world.</span>
+              </h2>
+              <p className="text-gray-300 text-sm mb-5 leading-relaxed">
+                Isi username, pilih nominal Robux, bayar via QRIS, dan biarkan kami memproses sisanya secara cepat dan transparan.
+              </p>
 
-            <div className="overflow-x-auto max-h-64 overflow-y-auto pr-1">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead className="sticky top-0 bg-[#121724] z-10">
-                  <tr className="border-b border-gray-800 text-xs text-gray-400 uppercase">
-                    <th className="py-2.5 px-3">Putaran</th>
-                    <th className="py-2.5 px-3">Modal Restock</th>
-                    <th className="py-2.5 px-3">Robux Terjual</th>
-                    <th className="py-2.5 px-3">Omzet Kotor</th>
-                    <th className="py-2.5 px-3">Laba Bersih</th>
-                    <th className="py-2.5 px-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800/60">
-                  {sortedRoundsData.map((r) => (
-                    <tr key={r.round} className="hover:bg-[#161d2e]">
-                      <td className="py-3 px-3 font-bold text-orange-400">Putaran {r.round}</td>
-                      <td className="py-3 px-3 text-gray-300">Rp {Number(r.modal).toLocaleString('id-ID')}</td>
-                      <td className="py-3 px-3 text-cyan-400 font-semibold">{Number(r.robux_sold).toLocaleString('id-ID')} R$</td>
-                      <td className="py-3 px-3 font-bold text-white">Rp {Number(r.revenue).toLocaleString('id-ID')}</td>
-                      <td className={`py-3 px-3 font-extrabold ${Number(r.profit) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {Number(r.profit) >= 0 ? '+' : ''}Rp {Number(r.profit).toLocaleString('id-ID')}
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${r.status === 'Berjalan' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-400'}`}>
-                          {r.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
-        {/* 4. Pengaturan Stok, Modal Putaran & Harga */}
-        <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6 space-y-6">
-          <div className="flex flex-wrap justify-between items-start gap-4">
-            <div>
-              <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Stok & Modal Aktif</p>
-              <h2 className="text-xl font-extrabold">Atur stok, modal putaran & toko</h2>
-            </div>
-            <button
-              onClick={handleToggleShopStatus}
-              className={`px-4 py-2 rounded-xl text-sm font-bold border transition ${isOpen ? 'bg-[#0e2923] border-emerald-500/40 text-emerald-400' : 'bg-red-950 border-red-500/40 text-red-400'}`}
-            >
-              {isOpen ? '🟢 Toko BUKA — tutup sementara' : '🔴 Toko TUTUP — buka kembali'}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1.5">Total stok Robux aktif (Putaran {currentRound})</label>
-              <input
-                type="number"
-                value={stock}
-                onChange={e => setStock(e.target.value)}
-                placeholder="Contoh: 5000"
-                className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-white font-bold focus:border-orange-500 outline-none"
-              />
-              <p className="text-xs text-gray-500 mt-1.5">Berkurang otomatis saat pesanan selesai.</p>
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-400 mb-1.5">Modal restock Putaran {currentRound} (Rp)</label>
-              <input
-                type="number"
-                value={roundCapital}
-                onChange={e => setRoundCapital(e.target.value)}
-                placeholder="Contoh: 615000"
-                className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-orange-400 font-bold focus:border-orange-500 outline-none"
-              />
-              <p className="text-xs text-gray-500 mt-1.5">Dipakai menghitung BEP & Laba Bersih putaran ini.</p>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-800 pt-5">
-            <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Harga Robux</p>
-            <h3 className="text-xl font-extrabold mb-4">Atur harga jual</h3>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-              {NOMINAL_LIST.map((nom) => (
-                <div key={nom}>
-                  <label className="block text-xs font-bold text-cyan-400 mb-1">{nom.toLocaleString('id-ID')} R$</label>
-                  <input
-                    type="number"
-                    value={prices[nom] || ''}
-                    onChange={e => setPrices({ ...prices, [nom]: Number(e.target.value) })}
-                    className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-2.5 text-sm text-white focus:border-orange-500 outline-none"
-                  />
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={handleSaveSettings}
-              disabled={savingSettings}
-              className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-6 py-3 rounded-xl text-sm transition"
-            >
-              {savingSettings ? 'Menyimpan...' : '💾 Simpan Perubahan Stok, Modal & Harga'}
-            </button>
-          </div>
-        </section>
-
-        {/* 5. Daftar Pesanan Masuk */}
-        <section className="space-y-4">
-          <div className="flex flex-wrap justify-between items-center gap-3">
-            <div className="flex flex-wrap gap-2">
-              {['Semua', 'Menunggu konfirmasi', 'Menunggu pembayaran', 'Pembayaran diterima', 'Selesai'].map(st => (
+              {/* TOMBOL PANDUAN & S&K */}
+              <div className="flex flex-wrap items-center gap-2.5 mb-5">
                 <button
-                  key={st}
-                  onClick={() => setStatusFilter(st)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${statusFilter === st ? 'bg-orange-600 text-white' : 'bg-[#121724] border border-gray-800 text-gray-400 hover:text-white'}`}
+                  type="button"
+                  onClick={() => setInfoModal('howto')}
+                  className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition flex items-center gap-1.5"
                 >
-                  {st}
+                  <span>📖</span> Cara Order
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setInfoModal('terms')}
+                  className="bg-[#161e35]/90 hover:bg-[#1f2a4a] border border-purple-400/40 text-purple-200 font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5"
+                >
+                  <span>📜</span> Syarat & Ketentuan
+                </button>
+              </div>
+
+              <div className="flex items-center gap-5 text-xs font-semibold text-gray-300">
+                <span className="flex items-center gap-1.5 text-orange-400">⚡ <span className="text-gray-300">Proses cepat</span></span>
+                <span className="flex items-center gap-1.5 text-emerald-400">🛡️ <span className="text-gray-300">100% aman</span></span>
+                <span className="flex items-center gap-1.5 text-cyan-400">🔍 <span className="text-gray-300">Lacak real-time</span></span>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <select
-                value={roundFilter}
-                onChange={e => setRoundFilter(e.target.value)}
-                className="bg-[#121724] border border-gray-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-bold outline-none"
-              >
-                <option value="Semua">Semua Putaran</option>
-                {availableRounds.map(rNum => (
-                  <option key={rNum} value={rNum}>Putaran {rNum}</option>
-                ))}
-              </select>
-
-              <select
-                value={sortOrder}
-                onChange={e => setSortOrder(e.target.value)}
-                className="bg-[#121724] border border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-300 outline-none"
-              >
-                <option value="newest">Terbaru dulu</option>
-                <option value="oldest">Terlama dulu</option>
-              </select>
+            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full border-2 border-cyan-400/40 bg-[#0b1122]/90 flex items-center justify-center relative shadow-[0_0_45px_rgba(6,182,212,0.28)] shrink-0">
+              <div className="w-24 h-24 rounded-full border border-purple-400/50 flex items-center justify-center bg-gradient-to-tr from-cyan-500/10 to-purple-500/10">
+                <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white via-cyan-200 to-orange-400 -rotate-12">R$</span>
+              </div>
             </div>
           </div>
 
-          {filteredOrders.length === 0 ? (
-            <div className="bg-[#121724] border border-gray-800 rounded-2xl p-8 text-center text-gray-400 text-sm">
-              Belum ada pesanan pada kategori ini.
+          {/* 01 DATA AKUN ROBLOX & CATATAN PENTING */}
+          <div className="bg-[#0e1425]/80 backdrop-blur-md border border-cyan-500/20 rounded-2xl p-6 mb-5 shadow-lg">
+            <div className="flex items-center gap-3 mb-5">
+              <span className="w-8 h-8 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 font-bold text-xs flex items-center justify-center">
+                01
+              </span>
+              <div>
+                <h3 className="font-extrabold text-lg">Data akun Roblox</h3>
+                <p className="text-xs text-gray-400">Pastikan username kamu sudah benar ya.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1.5">Username Roblox *</label>
+                <input
+                  type="text"
+                  value={robloxUsername}
+                  onChange={e => setRobloxUsername(e.target.value)}
+                  placeholder="Contoh: RobloxPlayer123"
+                  className="w-full bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none transition"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1.5">Display Name <span className="text-gray-500">(opsional)</span></label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                  placeholder="Contoh: DenzJr"
+                  className="w-full bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none transition"
+                />
+              </div>
+            </div>
+
+            <div className="mb-5">
+              <label className="block text-xs font-semibold text-gray-300 mb-1.5">No. WhatsApp kamu <span className="text-gray-500">(untuk update status)</span></label>
+              <input
+                type="text"
+                value={whatsapp}
+                onChange={e => setWhatsapp(e.target.value)}
+                placeholder="Contoh: 081234567890"
+                className="w-full md:w-1/2 bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none transition"
+              />
+            </div>
+
+            <div className="bg-[#1e1726]/90 border border-purple-500/30 rounded-xl p-4">
+              <p className="text-cyan-300 font-bold text-xs mb-1">⚡ Catatan penting</p>
+              <p className="text-gray-300 text-xs">Pastikan username sesuai huruf besar/kecil dan akun tidak dalam mode privat jika diperlukan.</p>
+            </div>
+          </div>
+
+          {/* STATUS STOK & TOKO */}
+          {!isOpen ? (
+            <div className="bg-red-950/85 backdrop-blur-md border border-red-500/50 rounded-xl p-4 mb-8 text-center shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+              <span className="text-red-300 font-bold">🔴 Toko Sedang Tutup Sementara — Pemesanan akan dibuka kembali segera.</span>
             </div>
           ) : (
-            filteredOrders.map((ord) => {
-              const orderCode = ord.order_number || ord.tracking_code || ord.id || ord._id;
-              const uName = ord.username || ord.roblox_username || '-';
-              const dName = ord.display_name || ord.buyer_name || '-';
-              const rawPhone = ord.buyer_phone !== undefined && ord.buyer_phone !== null ? String(ord.buyer_phone).trim() : '';
-              const bPhone = rawPhone && !rawPhone.startsWith('0') && !rawPhone.startsWith('62') ? `0${rawPhone}` : rawPhone;
-              const orderTotal = Number(ord.total ?? ord.total_price ?? 0);
-              const proofSrc = ord.proof_url || ord.payment_proof_url || '';
-              const orderRound = ord.round || currentRound;
-
-              const itemsList = Array.isArray(ord.items) && ord.items.length > 0
-                ? ord.items.map(it => `${Number(it.robux || 0).toLocaleString('id-ID')} R$ • Rp ${Number(it.price || 0).toLocaleString('id-ID')}`)
-                : [`${ord.robux_amount || 0} R$ • Rp ${orderTotal.toLocaleString('id-ID')}`];
-
-              const statusHistory = Array.isArray(ord.status_history) && ord.status_history.length > 0
-                ? ord.status_history
-                : (Array.isArray(ord.history) && ord.history.length > 0
-                  ? ord.history
-                  : (ord.created_at ? [{ status: ord.status, timestamp: ord.created_at }] : []));
-
-              const cleanPhone = String(bPhone).replace(/^0/, '62').replace(/[^0-9]/g, '');
-              const waUpdateMsg = encodeURIComponent(
-                `Halo *${dName !== '-' ? dName : uName}*, update pesanan DenzJr Store kamu:\n` +
-                `• No. Order: *${orderCode}*\n` +
-                `• Username Roblox: *${uName}*\n` +
-                `• Status Terbaru: *${ord.status}*\n\nTerima kasih sudah order!`
-              );
-
-              return (
-                <div key={orderCode} className="bg-[#121724] border border-gray-800 rounded-2xl p-5 space-y-4">
-                  <div className="flex flex-wrap justify-between items-start gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-extrabold text-orange-500">{orderCode}</h3>
-                        <span className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold px-2 py-0.5 rounded-md">
-                          Putaran {orderRound}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-400">{uName} • {dName} ({bPhone || '-'})</p>
-                      <div className="mt-2 flex flex-wrap gap-2 items-center">
-                        {itemsList.map((label, idx) => (
-                          <span key={idx} className="bg-[#1a2234] text-xs px-2.5 py-1 rounded-lg text-gray-300">
-                            {label}
-                          </span>
-                        ))}
-                        {proofSrc && (
-                          <button
-                            type="button"
-                            onClick={() => setPreviewProof({ src: proofSrc, orderCode, uName })}
-                            className="text-xs text-cyan-400 underline hover:text-cyan-300"
-                          >
-                            Lihat Bukti TF ↗
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={ord.status}
-                        onChange={e => handleStatusChange(orderCode, e.target.value)}
-                        className="bg-[#0b0f19] border border-gray-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-orange-500"
-                      >
-                        <option value="Menunggu konfirmasi">Menunggu konfirmasi</option>
-                        <option value="Menunggu pembayaran">Menunggu pembayaran</option>
-                        <option value="Pembayaran diterima">Pembayaran diterima</option>
-                        <option value="Selesai">Selesai</option>
-                      </select>
-
-                      <button
-                        onClick={() => handleDeleteOrder(orderCode)}
-                        className="bg-red-950/60 hover:bg-red-900 border border-red-500/40 text-red-400 p-2 rounded-xl"
-                        title="Hapus Pesanan"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center border-y border-gray-800 py-3">
-                    <span className="text-xs text-gray-400">Total</span>
-                    <span className="text-xl font-extrabold text-orange-500">Rp {orderTotal.toLocaleString('id-ID')}</span>
-                  </div>
-
-                  {statusHistory.length > 0 && (
-                    <div className="space-y-1.5">
-                      {statusHistory.map((h, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-xs">
-                          <span className="flex items-center gap-2 text-gray-200">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
-                            {h.status}
-                          </span>
-                          <span className="text-gray-500">{formatHistoryDate(h.timestamp || h.time || h.created_at)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {cleanPhone && (
-                    <a
-                      href={`https://wa.me/${cleanPhone}?text=${waUpdateMsg}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-block bg-[#0e2923] hover:bg-[#143a31] border border-emerald-500/40 text-emerald-400 text-xs font-bold px-4 py-2.5 rounded-xl transition"
-                    >
-                      Kirim Update ke Pembeli ↗
-                    </a>
-                  )}
-                </div>
-              );
-            })
+            <div className="bg-[#0b2526]/85 backdrop-blur-md border border-cyan-400/40 rounded-xl p-3.5 mb-8 text-center shadow-[0_0_20px_rgba(6,182,212,0.15)]">
+              <span className="text-cyan-300 font-semibold text-sm">
+                📦 Stok Robux tersedia: <strong className="text-white">{totalStock !== null && totalStock !== "" ? `${Number(totalStock).toLocaleString('id-ID')} R$` : 'Tersedia'}</strong>
+              </span>
+            </div>
           )}
-        </section>
 
-        {/* 6. Moderasi Ulasan (Compact Scrollable) */}
-        <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6">
-          <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Moderasi</p>
-          <h2 className="text-xl font-extrabold mb-4">
-            Ulasan pembeli <span className="text-xs font-normal text-gray-400">({reviews.length})</span>
-          </h2>
+          {/* JUDUL KATALOG */}
+          <div className="flex flex-wrap justify-between items-end mb-5 gap-2">
+            <div>
+              <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase mb-1">Pilih Sesuai Kebutuhanmu</p>
+              <h2 className="text-3xl font-extrabold">Nominal <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-500">Robux</span></h2>
+            </div>
+            <p className="text-xs text-gray-300">Harga transparan • Tanpa biaya tersembunyi</p>
+          </div>
 
-          {reviews.length === 0 ? (
-            <p className="text-sm text-gray-400">Belum ada ulasan masuk.</p>
-          ) : (
-            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-              {reviews.map((rev, index) => {
-                const revKey = rev.review_id || rev.id || rev._id || index;
-                return (
-                  <div key={revKey} className="bg-[#0b0f19] border border-gray-800 rounded-xl p-4 flex justify-between items-start gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-sm">{rev.name}</span>
-                        <span className="text-amber-400 text-xs">{'★'.repeat(rev.rating || 5)}</span>
-                        {rev.order_number && <span className="text-xs text-gray-500">({rev.order_number})</span>}
+          {/* GRID NOMINAL ROBUX */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-14">
+            {packages.map((pkg) => (
+              <div 
+                key={pkg.robux} 
+                className={`bg-[#0e1425]/80 backdrop-blur-md border rounded-2xl p-4 transition duration-200 flex flex-col justify-between hover:-translate-y-0.5 ${
+                  pkg.badge 
+                    ? 'border-orange-500/50 shadow-[0_0_20px_rgba(249,115,22,0.12)]' 
+                    : 'border-cyan-500/20 hover:border-cyan-400/60 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)]'
+                }`}
+              >
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="inline-block bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-[11px] font-bold px-2 py-0.5 rounded-md">R$</span>
+                    {pkg.badge && (
+                      <span className="bg-gradient-to-r from-orange-600 to-amber-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md tracking-wider uppercase shadow-sm">
+                        {pkg.badge}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-lg font-extrabold text-white">
+                    {pkg.robux.toLocaleString('id-ID')} <span className="text-xs font-normal text-gray-400">Robux</span>
+                  </div>
+                  <div className="text-base font-bold text-gray-100 mt-1 mb-4">
+                    Rp {pkg.price.toLocaleString('id-ID')}
+                  </div>
+                </div>
+                <button
+                  disabled={!isOpen || (totalStock !== null && totalStock !== "" && Number(totalStock) < pkg.robux)}
+                  onClick={() => addToCart(pkg)}
+                  className="w-full bg-[#16203a]/90 hover:bg-gradient-to-r hover:from-orange-500 hover:to-amber-500 hover:text-white disabled:opacity-40 disabled:hover:bg-[#16203a] text-cyan-100 border border-cyan-500/20 hover:border-transparent font-semibold text-xs py-2.5 rounded-xl transition"
+                >
+                  + Keranjang &gt;
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* ULASAN PEMBELI */}
+          <section className="mb-10">
+            <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase mb-1">Kata Mereka</p>
+            <h2 className="text-3xl font-extrabold mb-5">Ulasan <span className="text-orange-500">Pembeli</span></h2>
+
+            <form onSubmit={handleSendReview} className="bg-[#0e1425]/80 backdrop-blur-md border border-cyan-500/20 rounded-2xl p-6 mb-6">
+              <h3 className="font-bold text-lg mb-3">Beri ulasan</h3>
+              <div className="flex gap-2 mb-4">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    type="button"
+                    key={star}
+                    onClick={() => setRating(star)}
+                    className={`text-2xl transition ${star <= rating ? 'text-amber-400' : 'text-gray-600'}`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <input
+                  type="text"
+                  value={reviewName}
+                  onChange={e => setReviewName(e.target.value)}
+                  placeholder="Nama kamu (opsional)"
+                  className="bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none"
+                />
+                <input
+                  type="text"
+                  value={reviewOrderId}
+                  onChange={e => setReviewOrderId(e.target.value)}
+                  placeholder="No. Order (opsional)"
+                  className="bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none"
+                />
+              </div>
+
+              <textarea
+                rows="3"
+                required
+                value={reviewComment}
+                onChange={e => setReviewComment(e.target.value)}
+                placeholder="Ceritakan pengalaman top up kamu..."
+                className="w-full bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white mb-4 focus:border-cyan-400 outline-none"
+              />
+
+              <button
+                type="submit"
+                disabled={sendingReview}
+                className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold py-3 rounded-xl transition shadow-md"
+              >
+                {sendingReview ? 'Mengirim Ulasan...' : 'Kirim Ulasan'}
+              </button>
+            </form>
+
+            {reviews.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                    Menampilkan {showAllReviews ? reviews.length : Math.min(4, reviews.length)} dari {reviews.length} ulasan
+                  </p>
+                </div>
+
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${showAllReviews ? 'max-h-[420px] overflow-y-auto pr-1' : ''}`}>
+                  {(showAllReviews ? reviews : reviews.slice(0, 4)).map((rev, idx) => (
+                    <div key={rev.id || rev._id || idx} className="bg-[#0e1425]/80 backdrop-blur-md border border-cyan-500/20 rounded-xl p-4">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-bold text-sm text-white">{rev.name}</span>
+                        <span className="text-amber-400 text-sm">{'★'.repeat(rev.rating || 5)}</span>
                       </div>
-                      <p className="text-sm text-gray-300">{rev.comment}</p>
+                      <p className="text-gray-300 text-sm">{rev.comment}</p>
                     </div>
+                  ))}
+                </div>
+
+                {reviews.length > 4 && (
+                  <div className="text-center pt-1">
                     <button
-                      onClick={() => handleDeleteReview(rev)}
-                      className="text-red-400 hover:text-red-300 text-xs bg-red-950/60 border border-red-500/30 px-3 py-1.5 rounded-lg shrink-0"
+                      type="button"
+                      onClick={() => setShowAllReviews(!showAllReviews)}
+                      className="bg-[#131b30]/90 hover:bg-[#1b2744] border border-cyan-500/30 text-cyan-300 font-bold text-xs px-5 py-2.5 rounded-xl transition"
                     >
-                      Hapus
+                      {showAllReviews
+                        ? '▲ Sembunyikan Sebagian Ulasan'
+                        : `▼ Lihat Semua Ulasan (${reviews.length})`}
                     </button>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+                )}
+              </div>
+            )}
+          </section>
+
+          <footer className="border-t border-cyan-500/20 pt-6 flex flex-wrap justify-between text-xs text-gray-400">
+            <span>© 2026 DenzJr Store</span>
+            <span>Top up mudah, main lebih seru.</span>
+          </footer>
+        </main>
       </div>
 
-      {/* Modal Mulai Putaran Baru (Restock) */}
-      {showNewRoundModal && (
+      {/* FLOATING CART BAR */}
+      <div className="fixed bottom-0 left-0 right-0 bg-[#090d1a]/90 backdrop-blur-md border-t border-cyan-500/30 shadow-[0_-10px_30px_rgba(0,0,0,0.7)] z-40">
+        <div className="max-w-6xl mx-auto px-4 py-3.5 flex justify-between items-center">
+          <div>
+            <p className="text-xs text-gray-400">Keranjang kamu</p>
+            {cart.length === 0 ? (
+              <p className="text-sm font-bold text-orange-400">Masih kosong</p>
+            ) : (
+              <p className="text-sm font-bold text-white">
+                <span className="text-cyan-400">{totalRobux.toLocaleString('id-ID')} R$</span> • <span className="text-orange-400">Rp {totalPrice.toLocaleString('id-ID')}</span>
+              </p>
+            )}
+          </div>
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-[0_0_20px_rgba(249,115,22,0.35)]"
+          >
+            <span>🛒 Buka Keranjang</span>
+            <span className="bg-black/30 px-2 py-0.5 rounded-full text-xs">{cart.length}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* MODAL CARA ORDER & SYARAT KETENTUAN */}
+      {infoModal && (
         <div
-          onClick={() => setShowNewRoundModal(false)}
-          className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+          onClick={() => setInfoModal(null)}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-[#121724] border border-gray-800 rounded-2xl max-w-md w-full p-6 space-y-4"
+            className="bg-[#0e1425] border border-cyan-500/40 rounded-2xl max-w-md w-full p-6 shadow-[0_0_40px_rgba(6,182,212,0.2)]"
           >
-            <div>
-              <p className="text-xs text-cyan-400 font-bold uppercase">Siklus Restock Baru</p>
-              <h3 className="text-xl font-extrabold">Mulai Putaran ke-{currentRound + 1}</h3>
-              <p className="text-xs text-gray-400 mt-1">
-                Putaran {currentRound} akan ditandai <strong>Selesai</strong> di rekap laporan, statistik pesanan atas di-reset ke 0, dan order berikutnya otomatis masuk ke Putaran {currentRound + 1}.
-              </p>
+            <div className="flex justify-between items-center border-b border-gray-800 pb-3 mb-4">
+              <h3 className="text-lg font-extrabold text-cyan-300">
+                {infoModal === 'howto' ? '📖 Cara Order Robux' : '📜 Syarat & Ketentuan'}
+              </h3>
+              <button onClick={() => setInfoModal(null)} className="text-gray-400 hover:text-white text-xl font-bold">✕</button>
             </div>
 
-            <form onSubmit={handleStartNewRound} className="space-y-4">
-              <div>
-                <label className="block text-xs text-gray-300 mb-1">Modal Restock Putaran {currentRound + 1} (Rp)</label>
-                <input
-                  type="number"
-                  required
-                  value={nextRoundCapital}
-                  onChange={(e) => setNextRoundCapital(e.target.value)}
-                  placeholder="Contoh: 615000"
-                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-white font-bold focus:border-orange-500 outline-none"
-                />
-              </div>
+            {infoModal === 'howto' ? (
+              <ol className="space-y-2.5 text-sm text-gray-300 list-decimal list-inside leading-relaxed">
+                <li>Isi <strong className="text-white">Username Roblox</strong> dan nomor WhatsApp aktif pada kolom Data Akun.</li>
+                <li>Pilih paket <strong className="text-cyan-300">Nominal Robux</strong> yang diinginkan lalu klik <strong className="text-orange-400">+ Keranjang</strong>.</li>
+                <li>Buka keranjang, cek total Robux & pembayaran, lalu scan <strong className="text-white">QRIS DenzJr Store</strong>.</li>
+                <li>Cantumkan <strong className="text-cyan-300">No. Order</strong> di catatan transfer (opsional) dan upload bukti transfer.</li>
+                <li>Klik <strong className="text-emerald-400">Kirim Order & Bukti TF ke WhatsApp</strong> dan pantau progresnya di menu <strong className="text-white">Cek Status</strong>.</li>
+              </ol>
+            ) : (
+              <ul className="space-y-2.5 text-sm text-gray-300 list-disc list-inside leading-relaxed">
+                <li>Pastikan <strong className="text-white">Username Roblox</strong> sudah benar (kesalahan penulisan username di luar tanggung jawab admin).</li>
+                <li>Pesanan diproses sesuai antrean setelah pembayaran QRIS terverifikasi.</li>
+                <li>Wajib melampirkan bukti transfer asli dan jelas saat checkout.</li>
+                <li>Dana yang sudah masuk tidak dapat di-refund apabila pesanan sudah diproses.</li>
+              </ul>
+            )}
 
-              <div>
-                <label className="block text-xs text-gray-300 mb-1">Stok Robux Baru (R$)</label>
-                <input
-                  type="number"
-                  required
-                  value={nextRoundStock}
-                  onChange={(e) => setNextRoundStock(e.target.value)}
-                  placeholder="Contoh: 5000"
-                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-cyan-400 font-bold focus:border-orange-500 outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowNewRoundModal(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs text-gray-400 hover:text-white"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={startingNewRound}
-                  className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition"
-                >
-                  {startingNewRound ? 'Memproses...' : `Mulai Putaran ${currentRound + 1}`}
-                </button>
-              </div>
-            </form>
+            <button
+              type="button"
+              onClick={() => setInfoModal(null)}
+              className="mt-5 w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2.5 rounded-xl text-sm transition"
+            >
+              Mengerti
+            </button>
           </div>
         </div>
       )}
 
-      {/* Modal Preview Bukti Transfer */}
-      {previewProof && (
-        <div
-          onClick={() => setPreviewProof(null)}
-          className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-[#121724] border border-gray-800 rounded-2xl max-w-md w-full p-4 space-y-3"
-          >
-            <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-              <div>
-                <p className="text-xs text-cyan-400 font-bold">{previewProof.orderCode}</p>
-                <p className="text-xs text-gray-400">Bukti transfer • {previewProof.uName}</p>
-              </div>
-              <button
-                onClick={() => setPreviewProof(null)}
-                className="text-gray-400 hover:text-white text-lg font-bold px-2"
-              >
-                ✕
-              </button>
+      {/* MODAL KERANJANG & CHECKOUT QRIS */}
+      {isCartOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#0e1425] border border-cyan-500/30 rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto p-5 relative shadow-[0_0_40px_rgba(6,182,212,0.18)]">
+            <div className="flex justify-between items-center border-b border-gray-800 pb-3 mb-4">
+              <h3 className="text-lg font-extrabold">Keranjang & Pembayaran</h3>
+              <button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-white text-xl font-bold">✕</button>
             </div>
-            <img
-              src={previewProof.src}
-              alt="Bukti Transfer"
-              className="w-full max-h-[70vh] object-contain rounded-xl bg-black"
-            />
-            <div className="text-center">
-              <a
-                href={previewProof.src}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-cyan-400 underline hover:text-cyan-300"
-              >
-                Buka gambar ukuran penuh di Google Drive ↗
-              </a>
-            </div>
+
+            {cart.length === 0 ? (
+              <p className="text-center text-gray-400 py-8">Belum ada paket Robux yang dipilih.</p>
+            ) : (
+              <>
+                <div className="space-y-2 mb-4">
+                  {cart.map((item) => (
+                    <div key={item.cartId} className="bg-[#151e36] border border-cyan-500/20 rounded-xl p-3 flex justify-between items-center">
+                      <div>
+                        <p className="font-bold text-sm text-orange-400">{item.robux.toLocaleString('id-ID')} Robux</p>
+                        <p className="text-xs text-gray-300">Rp {item.price.toLocaleString('id-ID')}</p>
+                      </div>
+                      <button onClick={() => removeFromCart(item.cartId)} className="text-red-400 hover:text-red-300 text-sm px-2">🗑️</button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* RINGKASAN TOTAL ROBUX & TOTAL PEMBAYARAN */}
+                <div className="py-3 border-y border-gray-800 mb-4 space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-400">Total Robux:</span>
+                    <span className="font-extrabold text-cyan-400">{totalRobux.toLocaleString('id-ID')} R$</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-gray-300">Total pembayaran</span>
+                    <span className="text-2xl font-extrabold text-orange-500">Rp {totalPrice.toLocaleString('id-ID')}</span>
+                  </div>
+                </div>
+
+                {/* NO. ORDER LANGSUNG MUNCUL SEBELUM UPLOAD BUKTI TF */}
+                <div className="bg-[#131d36] border border-cyan-500/30 rounded-xl p-3 text-xs text-gray-300 mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-gray-400 block text-[11px]">No. Order kamu (simpan / cantumkan di catatan TF):</span>
+                    <span className="text-cyan-400 font-extrabold text-sm tracking-wide">{previewOrderNumber}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyOrderNumber}
+                    className="bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-400/40 text-cyan-300 font-bold px-3 py-1.5 rounded-lg text-[11px] transition shrink-0"
+                  >
+                    {copiedOrder ? '✓ Tersalin' : 'Salin'}
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowQris(!showQris)}
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-2.5 rounded-xl mb-3 transition text-sm"
+                >
+                  {showQris ? 'Sembunyikan QRIS' : 'Tampilkan QRIS'}
+                </button>
+
+                {showQris && (
+                  <div className="bg-[#080c17] border border-cyan-500/20 rounded-xl p-4 mb-4 text-center">
+                    <p className="text-cyan-400 font-bold text-sm mb-3">Scan QRIS DenzJr Store</p>
+                    <img src="/qris.jpeg" alt="QRIS DenzJr Store" className="w-56 mx-auto rounded-lg bg-white p-1.5 mb-3" />
+                    <a
+                      href="/qris.jpeg"
+                      download="QRIS-DenzJr-Store.jpeg"
+                      className="block w-full bg-[#16203a] hover:bg-[#1f2d52] text-gray-200 text-xs font-bold py-2.5 rounded-lg transition"
+                    >
+                      ⬇ Download QRIS
+                    </a>
+                  </div>
+                )}
+
+                <form onSubmit={handleCheckoutSubmit} className="space-y-3">
+                  <input
+                    type="text"
+                    required
+                    value={robloxUsername}
+                    onChange={e => setRobloxUsername(e.target.value)}
+                    placeholder="Username Roblox *"
+                    className="w-full bg-[#080c17] border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={e => setDisplayName(e.target.value)}
+                      placeholder="Display Name (opsional)"
+                      className="w-full bg-[#080c17] border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none"
+                    />
+                    <input
+                      type="text"
+                      required
+                      value={whatsapp}
+                      onChange={e => setWhatsapp(e.target.value)}
+                      placeholder="No. WhatsApp (08xx)"
+                      className="w-full bg-[#080c17] border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+
+                  <label className="block border border-dashed border-cyan-500/40 hover:border-cyan-400 rounded-xl p-3 text-center cursor-pointer transition bg-[#080c17]/60">
+                    <span className="text-xs text-gray-300">
+                      {paymentProof ? `✅ ${paymentProof.name}` : '☁️ Pilih bukti transfer (JPG, PNG, WEBP)'}
+                    </span>
+                    <input
+                      type="file"
+                      required
+                      accept="image/*"
+                      onChange={e => setPaymentProof(e.target.files[0])}
+                      className="hidden"
+                    />
+                  </label>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-extrabold py-3 rounded-xl transition text-sm"
+                  >
+                    {submitting ? 'Memproses Pesanan...' : '✓ Kirim Order & Bukti TF ke WhatsApp'}
+                  </button>
+                  <p className="text-[11px] text-center text-gray-500">
+                    Satu pesan WhatsApp berisi detail pesanan + link bukti transfer akan dikirim ke admin.
+                  </p>
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}
