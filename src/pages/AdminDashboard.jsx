@@ -11,6 +11,15 @@ const DEFAULT_PRICES = {
   2000: 310000, 3000: 465000, 4000: 620000, 5000: 750000
 };
 
+// Helper kirim sinyal sinkronisasi instan (0 detik) ke tab StorePage
+const notifyStoreSync = (payload) => {
+  if (typeof BroadcastChannel !== 'undefined') {
+    const channel = new BroadcastChannel('denzjr_store_sync');
+    channel.postMessage(payload);
+    channel.close();
+  }
+};
+
 export default function AdminDashboard() {
   const [pin, setPin] = useState('');
   const [token, setToken] = useState(localStorage.getItem('admin_token_gas') || '');
@@ -119,6 +128,7 @@ export default function AdminDashboard() {
       });
       if (res.error) throw new Error(res.error);
       setIsOpen(nextOpenState);
+      notifyStoreSync({ type: 'SHOP_STATUS_CHANGED', isOpen: nextOpenState });
       alert(nextOpenState ? 'Status toko diubah menjadi BUKA!' : 'Status toko diubah menjadi TUTUP sementara!');
     } catch (err) {
       alert('Gagal mengubah status buka/tutup toko.');
@@ -142,6 +152,7 @@ export default function AdminDashboard() {
       });
       if (res.error) throw new Error(res.error);
 
+      notifyStoreSync({ type: 'STORE_DATA_UPDATED' });
       alert('Perubahan stok, modal putaran & seluruh harga berhasil disimpan ke Google Sheets!');
       fetchAllAdminData();
     } catch (err) {
@@ -161,6 +172,7 @@ export default function AdminDashboard() {
       });
       if (res.error) throw new Error(res.error);
       setShowNewRoundModal(false);
+      notifyStoreSync({ type: 'STORE_DATA_UPDATED' });
       alert(`Berhasil memulai Putaran ke-${res.new_round}! Statistik putaran otomatis di-reset ke 0.`);
       fetchAllAdminData();
     } catch (err) {
@@ -174,6 +186,9 @@ export default function AdminDashboard() {
     try {
       const res = await gasStoreApi.adminUpdateStatus(token, orderNumber, newStatus);
       if (res.error) throw new Error(res.error);
+      if (newStatus === 'Selesai') {
+        notifyStoreSync({ type: 'STORE_DATA_UPDATED' });
+      }
       fetchAllAdminData();
     } catch (err) {
       alert('Gagal mengubah status pesanan.');
@@ -201,6 +216,7 @@ export default function AdminDashboard() {
     try {
       const res = await gasStoreApi.adminDeleteReview(token, revId);
       if (res.error) throw new Error(res.error);
+      notifyStoreSync({ type: 'STORE_DATA_UPDATED' });
       fetchAllAdminData();
     } catch (err) {
       alert(`Gagal menghapus ulasan: ${err.message}`);
