@@ -77,6 +77,7 @@ export default function StorePage() {
   const [infoModal, setInfoModal] = useState(null);
   const [previewOrderNumber, setPreviewOrderNumber] = useState(() => initialDraft?.previewOrderNumber || '');
   const [copiedOrder, setCopiedOrder] = useState(false);
+  const [copiedSuccessOrder, setCopiedSuccessOrder] = useState(false);
 
   const [robloxUsername, setRobloxUsername] = useState(() => initialDraft?.robloxUsername || '');
   const [displayName, setDisplayName] = useState(() => initialDraft?.displayName || '');
@@ -234,11 +235,52 @@ export default function StorePage() {
     setCart(cart.filter(item => item.cartId !== cartId));
   };
 
-  const handleCopyOrderNumber = () => {
+  const copyTextToClipboard = async (text) => {
+    if (!text) return false;
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (err) {
+      // Lanjut ke fallback execCommand untuk kompatibilitas browser mobile/iOS
+    }
+
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.setAttribute('readonly', '');
+      textArea.style.position = 'fixed';
+      textArea.style.top = '-9999px';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return successful;
+    } catch (err) {
+      return false;
+    }
+  };
+
+  const handleCopyOrderNumber = async () => {
     if (!previewOrderNumber) return;
-    navigator.clipboard.writeText(previewOrderNumber);
-    setCopiedOrder(true);
-    setTimeout(() => setCopiedOrder(false), 2000);
+    const ok = await copyTextToClipboard(previewOrderNumber);
+    if (ok) {
+      setCopiedOrder(true);
+      setTimeout(() => setCopiedOrder(false), 2000);
+    }
+  };
+
+  const handleCopySuccessOrderNumber = async () => {
+    const orderNum = checkoutSuccess?.orderNumber;
+    if (!orderNum) return;
+    const ok = await copyTextToClipboard(orderNum);
+    if (ok) {
+      setCopiedSuccessOrder(true);
+      setTimeout(() => setCopiedSuccessOrder(false), 2000);
+    }
   };
 
   const totalRobux = cart.reduce((sum, item) => sum + item.robux, 0);
@@ -349,6 +391,7 @@ export default function StorePage() {
       setDisplayName('');
       setWhatsapp('');
       setPreviewOrderNumber('');
+      setCopiedSuccessOrder(false);
       setCheckoutSuccess({
         orderNumber: finalOrderCode,
         username: trimmedUsername,
@@ -988,9 +1031,18 @@ export default function StorePage() {
               ✅
             </div>
             <h3 className="text-xl font-extrabold text-white mb-1">Pesanan Berhasil Dibuat!</h3>
-            <p className="text-xs text-gray-300 mb-4">
-              No. Order: <span className="text-cyan-300 font-bold">{checkoutSuccess.orderNumber}</span>
-            </p>
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <p className="text-xs text-gray-300">
+                No. Order: <span className="text-cyan-300 font-bold">{checkoutSuccess.orderNumber}</span>
+              </p>
+              <button
+                type="button"
+                onClick={handleCopySuccessOrderNumber}
+                className="bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-400/40 text-cyan-300 font-bold px-2.5 py-1 rounded-lg text-[11px] transition"
+              >
+                {copiedSuccessOrder ? '✓ Tersalin' : 'Salin'}
+              </button>
+            </div>
 
             <div className="bg-[#131d36] border border-cyan-500/25 rounded-xl p-3.5 text-xs text-gray-300 mb-5 space-y-1.5 text-left">
               <div className="flex justify-between gap-2">
