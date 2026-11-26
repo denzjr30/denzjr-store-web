@@ -657,76 +657,80 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* 5. Daftar Pesanan Masuk (Dalam Kotak Panel & Header Pembatas) */}
-        <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6 space-y-5">
-          <div className="flex flex-wrap justify-between items-end gap-3 border-b border-gray-800 pb-4">
-            <div>
-              <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Antrean Transaksi</p>
-              <h2 className="text-xl font-extrabold">
-                Daftar Pesanan Masuk{' '}
-                <span className="text-xs font-normal text-gray-400">
-                  ({filteredOrders.length} pesanan)
-                </span>
-              </h2>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Kelola konfirmasi transfer, salin username Roblox, ubah status, dan hubungi pembeli.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-              {/* Kolom Pencarian No. Order / Username / No. HP */}
-              <div className="relative flex-1 sm:w-64">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="🔍 Cari No Order / Username / WA..."
-                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl pl-3 pr-8 py-2 text-xs text-white placeholder-gray-500 focus:border-cyan-400 outline-none"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-bold"
-                    title="Hapus pencarian"
-                  >
-                    ✕
-                  </button>
-                )}
+        {/* 5. Daftar Pesanan Masuk (Header & Filter Sticky) */}
+        <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6">
+          {/* Blok Header + Pencarian + Filter Status yang Sticky */}
+          <div className="sticky top-0 z-20 bg-[#121724] -mx-6 -mt-6 px-6 pt-6 pb-4 mb-5 border-b border-gray-800 rounded-t-2xl space-y-4">
+            <div className="flex flex-wrap justify-between items-end gap-3">
+              <div>
+                <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Antrean Transaksi</p>
+                <h2 className="text-xl font-extrabold">
+                  Daftar Pesanan Masuk{' '}
+                  <span className="text-xs font-normal text-gray-400">
+                    ({filteredOrders.length} pesanan)
+                  </span>
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Kelola konfirmasi transfer, salin username Roblox, ubah status, dan hubungi pembeli.
+                </p>
               </div>
 
-              <select
-                value={roundFilter}
-                onChange={e => setRoundFilter(e.target.value)}
-                className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-bold outline-none"
-              >
-                <option value="Semua">Semua Putaran</option>
-                {availableRounds.map(rNum => (
-                  <option key={rNum} value={rNum}>Putaran {rNum}</option>
-                ))}
-              </select>
+              <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                {/* Kolom Pencarian No. Order / Username / No. HP */}
+                <div className="relative flex-1 sm:w-64">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="🔍 Cari No Order / Username / WA..."
+                    className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl pl-3 pr-8 py-2 text-xs text-white placeholder-gray-500 focus:border-cyan-400 outline-none"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-bold"
+                      title="Hapus pencarian"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
 
-              <select
-                value={sortOrder}
-                onChange={e => setSortOrder(e.target.value)}
-                className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-300 outline-none"
-              >
-                <option value="newest">Terbaru dulu</option>
-                <option value="oldest">Terlama dulu</option>
-              </select>
+                <select
+                  value={roundFilter}
+                  onChange={e => setRoundFilter(e.target.value)}
+                  className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-bold outline-none"
+                >
+                  <option value="Semua">Semua Putaran</option>
+                  {availableRounds.map(rNum => (
+                    <option key={rNum} value={rNum}>Putaran {rNum}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={sortOrder}
+                  onChange={e => setSortOrder(e.target.value)}
+                  className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-300 outline-none"
+                >
+                  <option value="newest">Terbaru dulu</option>
+                  <option value="oldest">Terlama dulu</option>
+                </select>
+              </div>
             </div>
-          </div>
 
-          <div className="flex flex-wrap gap-2">
-            {['Semua', 'Menunggu konfirmasi', 'Menunggu pembayaran', 'Pembayaran diterima', 'Selesai'].map(st => (
-              <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${statusFilter === st ? 'bg-orange-600 text-white' : 'bg-[#0b0f19] border border-gray-800 text-gray-400 hover:text-white'}`}
-              >
-                {st}
-              </button>
-            ))}
+            {/* Filter Tab Status */}
+            <div className="flex flex-wrap gap-2">
+              {['Semua', 'Menunggu konfirmasi', 'Menunggu pembayaran', 'Pembayaran diterima', 'Selesai'].map(st => (
+                <button
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${statusFilter === st ? 'bg-orange-600 text-white' : 'bg-[#0b0f19] border border-gray-800 text-gray-400 hover:text-white'}`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
           </div>
 
           {filteredOrders.length === 0 ? (
