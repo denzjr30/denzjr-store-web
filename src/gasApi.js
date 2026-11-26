@@ -69,7 +69,7 @@ export const gasStoreApi = {
   adminDeleteOrder: (token, orderNumber) =>
     gasPost({ action: "deleteOrder", token, order_number: orderNumber }),
 
-  adminUpdateConfig: (token, { closed, totalStock, roundCapital, prices }) =>
+  adminUpdateConfig: (token, { closed, totalStock, roundCapital, prices, promoPrices }) =>
     gasPost({
       action: "updateShopConfig",
       token,
@@ -77,6 +77,7 @@ export const gasStoreApi = {
       total_stock: totalStock,
       round_capital: roundCapital,
       prices,
+      promo_prices: promoPrices,
     }),
 
   adminStartNewRound: (token, { newCapital, newStock }) =>
