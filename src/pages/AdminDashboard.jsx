@@ -34,7 +34,8 @@ export default function AdminDashboard() {
   const [isOpen, setIsOpen] = useState(true);
   const [prices, setPrices] = useState(DEFAULT_PRICES);
   const [promoPrices, setPromoPrices] = useState({});
-  const [savingSettings, setSavingSettings] = useState(false);
+  const [savingStockCapital, setSavingStockCapital] = useState(false);
+  const [savingPrices, setSavingPrices] = useState(false);
   const [previewProof, setPreviewProof] = useState(null);
 
   const [showNewRoundModal, setShowNewRoundModal] = useState(false);
@@ -138,10 +139,30 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSaveSettings = async () => {
-    setSavingSettings(true);
+  const handleSaveStockAndCapital = async () => {
+    setSavingStockCapital(true);
     try {
       const stockValue = stock === '' ? null : Number(stock);
+      const res = await gasStoreApi.adminUpdateConfig(token, {
+        closed: !isOpen,
+        totalStock: stockValue,
+        roundCapital: Number(roundCapital || 0)
+      });
+      if (res.error) throw new Error(res.error);
+
+      notifyStoreSync({ type: 'STORE_DATA_UPDATED' });
+      alert('Perubahan stok & modal putaran berhasil disimpan ke Google Sheets!');
+      fetchAllAdminData();
+    } catch (err) {
+      alert(`Gagal menyimpan stok & modal: ${err.message}`);
+    } finally {
+      setSavingStockCapital(false);
+    }
+  };
+
+  const handleSavePrices = async () => {
+    setSavingPrices(true);
+    try {
       const formattedPrices = {};
       const formattedPromoPrices = {};
 
@@ -152,21 +173,18 @@ export default function AdminDashboard() {
       });
 
       const res = await gasStoreApi.adminUpdateConfig(token, {
-        closed: !isOpen,
-        totalStock: stockValue,
-        roundCapital: Number(roundCapital || 0),
         prices: formattedPrices,
         promoPrices: formattedPromoPrices
       });
       if (res.error) throw new Error(res.error);
 
       notifyStoreSync({ type: 'STORE_DATA_UPDATED' });
-      alert('Perubahan stok, modal, harga normal & harga promo berhasil disimpan ke Google Sheets!');
+      alert('Perubahan harga normal & harga promo berhasil disimpan ke Google Sheets!');
       fetchAllAdminData();
     } catch (err) {
-      alert(`Gagal menyimpan: ${err.message}`);
+      alert(`Gagal menyimpan harga: ${err.message}`);
     } finally {
-      setSavingSettings(false);
+      setSavingPrices(false);
     }
   };
 
@@ -520,6 +538,16 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          <div>
+            <button
+              onClick={handleSaveStockAndCapital}
+              disabled={savingStockCapital}
+              className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition"
+            >
+              {savingStockCapital ? 'Menyimpan...' : '💾 Simpan Stok & Modal'}
+            </button>
+          </div>
+
           <div className="border-t border-gray-800 pt-5">
             <div className="flex flex-wrap justify-between items-end gap-2 mb-4">
               <div>
@@ -586,11 +614,11 @@ export default function AdminDashboard() {
             </div>
 
             <button
-              onClick={handleSaveSettings}
-              disabled={savingSettings}
+              onClick={handleSavePrices}
+              disabled={savingPrices}
               className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-6 py-3 rounded-xl text-sm transition"
             >
-              {savingSettings ? 'Menyimpan...' : '💾 Simpan Perubahan Stok, Modal & Harga'}
+              {savingPrices ? 'Menyimpan...' : '💾 Simpan Perubahan Harga'}
             </button>
           </div>
         </section>
