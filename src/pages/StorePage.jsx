@@ -529,98 +529,100 @@ export default function StorePage() {
 
         <main className="max-w-6xl mx-auto px-4 pt-6">
           {/* HERO BANNER */}
-          <div className="bg-gradient-to-br from-[#0e1528]/85 via-[#11172b]/85 to-[#16122c]/85 backdrop-blur-md border border-cyan-500/30 rounded-2xl p-6 md:p-9 mb-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_0_35px_rgba(6,182,212,0.12)]">
-            <div className="max-w-xl">
-              <div className="inline-flex items-center gap-2 bg-cyan-500/10 border border-cyan-400/30 px-3 py-1 rounded-full mb-3">
-                <span className="text-xs font-bold tracking-wider text-cyan-300 uppercase">✨ Top Up Robux Aman & Cepat</span>
+          <div className="bg-gradient-to-br from-[#0e1528]/85 via-[#11172b]/85 to-[#16122c]/85 backdrop-blur-md border border-cyan-500/30 rounded-2xl p-4 sm:p-6 md:p-8 mb-4 flex items-center justify-between gap-3 sm:gap-6 shadow-[0_0_35px_rgba(6,182,212,0.12)]">
+            <div className="flex-1 min-w-0">
+              <div className="inline-flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-400/30 px-2.5 py-0.5 rounded-full mb-2">
+                <span className="text-[10px] sm:text-xs font-bold tracking-wider text-cyan-300 uppercase">✨ Top Up Robux Aman & Cepat</span>
               </div>
-              <h2 className="text-3xl md:text-4xl font-extrabold leading-tight mb-3">
+              <h2 className="text-xl sm:text-3xl md:text-4xl font-extrabold leading-tight mb-1.5 sm:mb-2.5">
                 Level up your <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-400 to-cyan-400">Roblox world.</span>
               </h2>
-              <p className="text-gray-300 text-sm mb-5 leading-relaxed">
-                Isi username, pilih nominal Robux, bayar via QRIS, dan biarkan kami memproses sisanya secara cepat dan transparan.
+              <p className="text-gray-300 text-xs sm:text-sm mb-3 sm:mb-4 leading-snug sm:leading-relaxed">
+                Isi username, pilih nominal Robux, bayar via QRIS, dan biarkan kami memproses sisanya secara cepat.
               </p>
 
-              <div className="flex flex-wrap items-center gap-2.5 mb-5">
+              <div className="flex items-center gap-2 mb-3">
                 <button
                   type="button"
                   onClick={() => setInfoModal('howto')}
-                  className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition flex items-center gap-1.5"
+                  className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-[11px] sm:text-xs px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition flex items-center gap-1 shrink-0"
                 >
                   <span>📖</span> Cara Order
                 </button>
                 <button
                   type="button"
                   onClick={() => setInfoModal('terms')}
-                  className="bg-[#161e35]/90 hover:bg-[#1f2a4a] border border-purple-400/40 text-purple-200 font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5"
+                  className="bg-[#161e35]/90 hover:bg-[#1f2a4a] border border-purple-400/40 text-purple-200 font-bold text-[11px] sm:text-xs px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition flex items-center gap-1 shrink-0"
                 >
                   <span>📜</span> Syarat & Ketentuan
                 </button>
               </div>
 
-              <div className="flex items-center gap-5 text-xs font-semibold text-gray-300">
-                <span className="flex items-center gap-1.5 text-orange-400">⚡ <span className="text-gray-300">Proses cepat</span></span>
-                <span className="flex items-center gap-1.5 text-emerald-400">🛡️ <span className="text-gray-300">100% aman</span></span>
-                <span className="flex items-center gap-1.5 text-cyan-400">🔍 <span className="text-gray-300">Lacak real-time</span></span>
+              <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-[11px] sm:text-xs font-semibold text-gray-300">
+                <span className="flex items-center gap-1 text-orange-400">⚡ <span className="text-gray-300">Cepat</span></span>
+                <span className="flex items-center gap-1 text-emerald-400">🛡️ <span className="text-gray-300">100% aman</span></span>
+                <span className="flex items-center gap-1 text-cyan-400">🔍 <span className="text-gray-300">Real-time</span></span>
               </div>
             </div>
 
-            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full border-2 border-cyan-400/40 bg-[#0b1122]/90 flex items-center justify-center relative shadow-[0_0_45px_rgba(6,182,212,0.28)] shrink-0">
-              <div className="w-24 h-24 rounded-full border border-purple-400/50 flex items-center justify-center bg-gradient-to-tr from-cyan-500/10 to-purple-500/10">
-                <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white via-cyan-200 to-orange-400 -rotate-12">R$</span>
+            <div className="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 rounded-full border-2 border-cyan-400/40 bg-[#0b1122]/90 flex items-center justify-center relative shadow-[0_0_35px_rgba(6,182,212,0.28)] shrink-0">
+              <div className="w-12 h-12 sm:w-18 sm:h-18 md:w-24 md:h-24 rounded-full border border-purple-400/50 flex items-center justify-center bg-gradient-to-tr from-cyan-500/10 to-purple-500/10">
+                <span className="text-base sm:text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white via-cyan-200 to-orange-400 -rotate-12">R$</span>
               </div>
             </div>
           </div>
 
           {/* 01 DATA AKUN ROBLOX & CATATAN PENTING */}
-          <div className="bg-[#0e1425]/80 backdrop-blur-md border border-cyan-500/20 rounded-2xl p-6 mb-5 shadow-lg">
-            <div className="flex items-center gap-3 mb-5">
-              <span className="w-8 h-8 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 font-bold text-xs flex items-center justify-center">
+          <div className="bg-[#0e1425]/80 backdrop-blur-md border border-cyan-500/20 rounded-2xl p-4 sm:p-6 mb-4 shadow-lg">
+            <div className="flex items-center gap-2.5 mb-3.5">
+              <span className="w-7 h-7 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 font-bold text-xs flex items-center justify-center shrink-0">
                 01
               </span>
               <div>
-                <h3 className="font-extrabold text-lg">Data akun Roblox</h3>
-                <p className="text-xs text-gray-400">Pastikan username kamu sudah benar ya.</p>
+                <h3 className="font-extrabold text-base sm:text-lg leading-tight">Data akun Roblox</h3>
+                <p className="text-[11px] sm:text-xs text-gray-400">Pastikan username kamu sudah benar ya.</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-4 mb-2.5 sm:mb-3.5">
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1.5">Username Roblox *</label>
+                <label className="block text-[11px] sm:text-xs font-semibold text-gray-300 mb-1">Username Roblox *</label>
                 <input
                   type="text"
                   value={robloxUsername}
                   onChange={e => setRobloxUsername(e.target.value)}
-                  placeholder="Contoh: RobloxPlayer123"
-                  className="w-full bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none transition"
+                  placeholder="RobloxPlayer123"
+                  className="w-full bg-[#080c17]/90 border border-gray-700/80 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-white focus:border-cyan-400 outline-none transition"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1.5">Display Name <span className="text-gray-500">(opsional)</span></label>
+                <label className="block text-[11px] sm:text-xs font-semibold text-gray-300 mb-1">Display Name <span className="text-gray-500">(opsional)</span></label>
                 <input
                   type="text"
                   value={displayName}
                   onChange={e => setDisplayName(e.target.value)}
-                  placeholder="Contoh: DenzJr"
-                  className="w-full bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none transition"
+                  placeholder="DenzJr"
+                  className="w-full bg-[#080c17]/90 border border-gray-700/80 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-white focus:border-cyan-400 outline-none transition"
                 />
               </div>
             </div>
 
-            <div className="mb-5">
-              <label className="block text-xs font-semibold text-gray-300 mb-1.5">No. WhatsApp kamu <span className="text-gray-500">(untuk update status)</span></label>
+            <div className="mb-3">
+              <label className="block text-[11px] sm:text-xs font-semibold text-gray-300 mb-1">No. WhatsApp kamu <span className="text-gray-500">(untuk update status)</span></label>
               <input
                 type="text"
                 value={whatsapp}
                 onChange={e => setWhatsapp(e.target.value)}
                 placeholder="Contoh: 081234567890"
-                className="w-full md:w-1/2 bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none transition"
+                className="w-full md:w-1/2 bg-[#080c17]/90 border border-gray-700/80 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-white focus:border-cyan-400 outline-none transition"
               />
             </div>
 
-            <div className="bg-[#1e1726]/90 border border-purple-500/30 rounded-xl p-4">
-              <p className="text-cyan-300 font-bold text-xs mb-1">⚡ Catatan penting</p>
-              <p className="text-gray-300 text-xs">Pastikan username sesuai huruf besar/kecil dan akun tidak dalam mode privat jika diperlukan.</p>
+            <div className="bg-[#1e1726]/90 border border-purple-500/30 rounded-xl px-3 py-2 flex items-center gap-2">
+              <span className="text-cyan-300 text-xs shrink-0">⚡</span>
+              <p className="text-gray-300 text-[11px] sm:text-xs truncate">
+                <strong className="text-cyan-300">Penting:</strong> Cek huruf besar/kecil username &amp; pastikan sudah sesuai.
+              </p>
             </div>
           </div>
 
