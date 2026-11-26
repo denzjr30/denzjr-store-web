@@ -437,60 +437,16 @@ export default function StorePage() {
 
   return (
     <div className="min-h-screen text-white font-sans pb-28 relative overflow-x-hidden bg-[#060812]">
-      {/* ANIMASI LIVE WALLPAPER CSS */}
-      <style>{`
-        @keyframes denzjrLiveBg {
-          0%, 100% {
-            transform: scale(1.03) translateY(0px);
-            filter: brightness(0.95) saturate(1.1);
-          }
-          50% {
-            transform: scale(1.09) translateY(-10px);
-            filter: brightness(1.12) saturate(1.3);
-          }
-        }
-        @keyframes neonOrbFloat {
-          0%, 100% {
-            transform: translateY(0px) scale(1);
-            opacity: 0.35;
-          }
-          50% {
-            transform: translateY(-28px) scale(1.15);
-            opacity: 0.75;
-          }
-        }
-        .live-wallpaper-layer {
-          animation: denzjrLiveBg 12s ease-in-out infinite;
-        }
-        .neon-orb-cyan {
-          animation: neonOrbFloat 7s ease-in-out infinite;
-        }
-        .neon-orb-purple {
-          animation: neonOrbFloat 9s ease-in-out infinite reverse;
-        }
-      `}</style>
+      {/* LAYER 1: BACKGROUND GAMBAR STATIS RINGAN (TANPA LAG) */}
+      <div
+        className="fixed inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none z-0"
+        style={{
+          backgroundImage: "url('/bg-denzjr.jpeg')",
+          filter: "brightness(1.05) contrast(1.05)",
+        }}
+      />
 
-      {/* LAYER 1: VIDEO LIVE WALLPAPER (bg-denzjr.mp4 - 154KB) */}
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        preload="auto"
-        className="fixed inset-0 w-full h-full object-cover pointer-events-none z-0"
-        style={{ filter: "brightness(1.08) contrast(1.06)" }}
-      >
-        <source src="/bg-denzjr.mp4" type="video/mp4" />
-      </video>
-
-      {/* LAYER 2: PARTIKEL CAHAYA NEON MELAYANG */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="neon-orb-cyan absolute top-24 left-8 w-44 h-44 rounded-full bg-cyan-500/20 blur-3xl" />
-        <div className="neon-orb-purple absolute bottom-32 right-8 w-52 h-52 rounded-full bg-purple-600/25 blur-3xl" />
-        <div className="neon-orb-cyan absolute top-1/2 left-1/3 w-36 h-36 rounded-full bg-blue-500/15 blur-3xl" />
-      </div>
-
-      {/* LAYER 3: VIGNETTE GELAP TENGAH */}
+      {/* LAYER 2: VIGNETTE GELAP TENGAH */}
       <div className="fixed inset-0 bg-gradient-to-b from-[#060913]/65 via-[#070b17]/75 to-[#050811]/85 pointer-events-none z-0" />
 
       {/* KONTEN UTAMA */}
