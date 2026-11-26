@@ -346,11 +346,18 @@ export default function StorePage() {
         }
       `}</style>
 
-      {/* LAYER 1: GAMBAR LIVE BACKGROUND (bg-denzjr.jpeg) */}
-      <div
-        className="fixed inset-0 bg-cover bg-center pointer-events-none z-0 live-wallpaper-layer"
-        style={{ backgroundImage: "url('/bg-denzjr.jpeg')" }}
-      />
+      {/* LAYER 1: VIDEO LIVE WALLPAPER (bg-denzjr.mp4 - 154KB) */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="auto"
+        className="fixed inset-0 w-full h-full object-cover pointer-events-none z-0"
+        style={{ filter: "brightness(1.08) contrast(1.06)" }}
+      >
+        <source src="/bg-denzjr.mp4" type="video/mp4" />
+      </video>
 
       {/* LAYER 2: PARTIKEL CAHAYA NEON MELAYANG */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
