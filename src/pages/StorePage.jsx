@@ -3,6 +3,36 @@ import { gasStoreApi } from '../gasApi';
 import { Link } from 'react-router-dom';
 
 const ADMIN_WHATSAPP = "6281958085966";
+const CHECKOUT_DRAFT_KEY = "denzjr_checkout_draft_v1";
+
+const loadCheckoutDraft = () => {
+  try {
+    const raw = localStorage.getItem(CHECKOUT_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    return {
+      cart: Array.isArray(parsed.cart)
+        ? parsed.cart.filter(
+            (item) =>
+              item &&
+              typeof item === 'object' &&
+              Number.isFinite(Number(item.robux)) &&
+              Number.isFinite(Number(item.price))
+          )
+        : [],
+      robloxUsername: typeof parsed.robloxUsername === 'string' ? parsed.robloxUsername : '',
+      displayName: typeof parsed.displayName === 'string' ? parsed.displayName : '',
+      whatsapp: typeof parsed.whatsapp === 'string' ? parsed.whatsapp : '',
+      isCartOpen: Boolean(parsed.isCartOpen),
+      showQris: typeof parsed.showQris === 'boolean' ? parsed.showQris : true,
+      previewOrderNumber: typeof parsed.previewOrderNumber === 'string' ? parsed.previewOrderNumber : '',
+    };
+  } catch (err) {
+    return null;
+  }
+};
 
 const DEFAULT_PACKAGES = [
   { robux: 10, price: 2000, badge: 'KELIPATAN 10' },
@@ -36,22 +66,24 @@ const generateOrderNumber = () => {
 };
 
 export default function StorePage() {
+  const [initialDraft] = useState(() => loadCheckoutDraft());
   const [packages, setPackages] = useState(DEFAULT_PACKAGES);
   const [totalStock, setTotalStock] = useState(null);
   const [isOpen, setIsOpen] = useState(true);
-  const [cart, setCart] = useState([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [showQris, setShowQris] = useState(true);
+  const [cart, setCart] = useState(() => initialDraft?.cart || []);
+  const [isCartOpen, setIsCartOpen] = useState(() => initialDraft?.isCartOpen || false);
+  const [showQris, setShowQris] = useState(() => initialDraft?.showQris ?? true);
 
   const [infoModal, setInfoModal] = useState(null);
-  const [previewOrderNumber, setPreviewOrderNumber] = useState('');
+  const [previewOrderNumber, setPreviewOrderNumber] = useState(() => initialDraft?.previewOrderNumber || '');
   const [copiedOrder, setCopiedOrder] = useState(false);
 
-  const [robloxUsername, setRobloxUsername] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
+  const [robloxUsername, setRobloxUsername] = useState(() => initialDraft?.robloxUsername || '');
+  const [displayName, setDisplayName] = useState(() => initialDraft?.displayName || '');
+  const [whatsapp, setWhatsapp] = useState(() => initialDraft?.whatsapp || '');
   const [paymentProof, setPaymentProof] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [checkoutSuccess, setCheckoutSuccess] = useState(null);
 
   const [reviews, setReviews] = useState([]);
   const [rating, setRating] = useState(5);
@@ -157,6 +189,37 @@ export default function StorePage() {
       setPreviewOrderNumber('');
     }
   }, [cart.length, previewOrderNumber]);
+
+  useEffect(() => {
+    try {
+      const hasDraftContent =
+        cart.length > 0 ||
+        robloxUsername.trim() !== '' ||
+        displayName.trim() !== '' ||
+        whatsapp.trim() !== '' ||
+        isCartOpen;
+
+      if (!hasDraftContent) {
+        localStorage.removeItem(CHECKOUT_DRAFT_KEY);
+        return;
+      }
+
+      localStorage.setItem(
+        CHECKOUT_DRAFT_KEY,
+        JSON.stringify({
+          cart,
+          robloxUsername,
+          displayName,
+          whatsapp,
+          isCartOpen,
+          showQris,
+          previewOrderNumber,
+        })
+      );
+    } catch (err) {
+      // Abaikan error penyimpanan jika localStorage dibatasi browser
+    }
+  }, [cart, robloxUsername, displayName, whatsapp, isCartOpen, showQris, previewOrderNumber]);
 
   const addToCart = (pkg) => {
     if (!isOpen) return alert("Maaf, toko sedang tutup sementara.");
@@ -268,6 +331,17 @@ export default function StorePage() {
         `------------------------------------\n\n` +
         `Mohon dicek bukti transfer yang saya lampirkan di chat ini dan segera diproses ya Admin, terima kasih! 🙏`;
 
+      const trimmedUsername = robloxUsername.trim();
+      const orderTotalRobux = totalRobux;
+      const orderTotalPrice = totalPrice;
+      const waUrl = `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(waMessage)}`;
+
+      try {
+        localStorage.removeItem(CHECKOUT_DRAFT_KEY);
+      } catch (storageErr) {
+        // Abaikan error localStorage saat membersihkan draf
+      }
+
       setCart([]);
       setIsCartOpen(false);
       setPaymentProof(null);
@@ -275,9 +349,16 @@ export default function StorePage() {
       setDisplayName('');
       setWhatsapp('');
       setPreviewOrderNumber('');
+      setCheckoutSuccess({
+        orderNumber: finalOrderCode,
+        username: trimmedUsername,
+        totalRobux: orderTotalRobux,
+        totalPrice: orderTotalPrice,
+        waUrl,
+      });
       fetchStoreData();
 
-      window.open(`https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(waMessage)}`, '_blank');
+      window.location.href = waUrl;
     } catch (err) {
       alert(`Gagal mengirim pesanan: ${err.message}`);
     } finally {
@@ -895,6 +976,64 @@ export default function StorePage() {
                 </form>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SUKSES ORDER & TOMBOL CADANGAN WHATSAPP */}
+      {checkoutSuccess && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#0e1425] border border-emerald-500/40 rounded-2xl max-w-md w-full p-6 shadow-[0_0_40px_rgba(16,185,129,0.22)] text-center">
+            <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-400/40 flex items-center justify-center mx-auto mb-4 text-2xl">
+              ✅
+            </div>
+            <h3 className="text-xl font-extrabold text-white mb-1">Pesanan Berhasil Dibuat!</h3>
+            <p className="text-xs text-gray-300 mb-4">
+              No. Order: <span className="text-cyan-300 font-bold">{checkoutSuccess.orderNumber}</span>
+            </p>
+
+            <div className="bg-[#131d36] border border-cyan-500/25 rounded-xl p-3.5 text-xs text-gray-300 mb-5 space-y-1.5 text-left">
+              <div className="flex justify-between gap-2">
+                <span className="text-gray-400">Username Roblox</span>
+                <span className="font-bold text-white">{checkoutSuccess.username}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-gray-400">Total Robux</span>
+                <span className="font-bold text-cyan-300">{checkoutSuccess.totalRobux.toLocaleString('id-ID')} R$</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-gray-400">Total Pembayaran</span>
+                <span className="font-bold text-orange-400">Rp {checkoutSuccess.totalPrice.toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-300 mb-4 leading-relaxed">
+              Jika WhatsApp belum terbuka otomatis, tekan tombol di bawah ini untuk mengirim detail pesanan &amp; konfirmasi ke admin:
+            </p>
+
+            <a
+              href={checkoutSuccess.waUrl}
+              className="block w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-extrabold py-3 rounded-xl transition text-sm mb-2.5"
+            >
+              💬 Buka WhatsApp Sekarang
+            </a>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                to="/status"
+                onClick={() => setCheckoutSuccess(null)}
+                className="bg-[#151e36] hover:bg-[#1d2948] border border-cyan-500/30 text-cyan-300 font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center"
+              >
+                📦 Cek Status
+              </Link>
+              <button
+                type="button"
+                onClick={() => setCheckoutSuccess(null)}
+                className="bg-[#151e36] hover:bg-[#1d2948] border border-gray-700 text-gray-300 font-bold py-2.5 rounded-xl text-xs transition"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}
