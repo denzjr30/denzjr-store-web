@@ -44,6 +44,9 @@ export default function StorePage() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [showQris, setShowQris] = useState(true);
 
+  // Modal Info (Cara Order & S&K)
+  const [infoModal, setInfoModal] = useState(null); // 'howto' | 'terms' | null
+
   // No. Order aktif yang langsung muncul sebelum upload bukti transfer
   const [previewOrderNumber, setPreviewOrderNumber] = useState('');
   const [copiedOrder, setCopiedOrder] = useState(false);
@@ -108,14 +111,12 @@ export default function StorePage() {
   useEffect(() => {
     fetchStoreData();
 
-    // 1. Cek otomatis setiap 3 detik HANYA saat tab sedang aktif dibuka
     const syncInterval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         fetchStoreData();
       }
     }, 3000);
 
-    // 2. Sinkronisasi instan (0 detik) jika diubah dari AdminDashboard di browser yang sama
     let channel = null;
     if (typeof BroadcastChannel !== 'undefined') {
       channel = new BroadcastChannel('denzjr_store_sync');
@@ -129,7 +130,6 @@ export default function StorePage() {
       };
     }
 
-    // 3. Langsung sinkronkan saat pembeli kembali membuka tab/layar browser
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
         fetchStoreData();
@@ -221,7 +221,6 @@ export default function StorePage() {
         subtotal: Number(item.price)
       }));
 
-      // Kirim ke Google Apps Script (menyertakan order_number yang sudah tampil di layar)
       const res = await fetch(
         process.env.REACT_APP_GAS_URL || (await import('../gasApi')).GAS_URL,
         {
@@ -267,7 +266,6 @@ export default function StorePage() {
         `------------------------------------\n\n` +
         `Mohon dicek bukti transfer yang saya lampirkan di chat ini dan segera diproses ya Admin, terima kasih! 🙏`;
 
-      // Reset keranjang & seluruh form Data Akun Roblox otomatis
       setCart([]);
       setIsCartOpen(false);
       setPaymentProof(null);
@@ -312,66 +310,140 @@ export default function StorePage() {
   };
 
   return (
-    <div 
-      className="min-h-screen text-white font-sans bg-cover bg-center bg-fixed pb-28 relative"
-      style={{ backgroundImage: "url('/background.jpeg')" }}
-    >
-      <div className="min-h-screen bg-[#0b0f19]/75 backdrop-blur-[1px]">
-        {/* HEADER */}
-        <header className="max-w-6xl mx-auto px-4 py-5 flex flex-wrap justify-between items-center gap-4 border-b border-gray-800/80">
-          <div className="flex items-center gap-3">
-            <img src="/logo.jpeg" alt="DenzJr Store" className="w-11 h-11 rounded-xl object-cover border border-orange-500/50 shadow-md" />
-            <div>
-              <h1 className="text-xl font-extrabold tracking-wide">
-                DENZJR <span className="text-orange-500">STORE</span>
-              </h1>
-              <p className="text-[11px] tracking-widest text-gray-400 uppercase">Roblox Top Up Center</p>
-            </div>
-          </div>
+    <div className="min-h-screen text-white font-sans pb-28 relative overflow-x-hidden bg-[#060812]">
+      {/* ANIMASI LIVE WALLPAPER CSS */}
+      <style>{`
+        @keyframes denzjrLiveBg {
+          0%, 100% {
+            transform: scale(1.03) translateY(0px);
+            filter: brightness(0.95) saturate(1.1);
+          }
+          50% {
+            transform: scale(1.09) translateY(-10px);
+            filter: brightness(1.12) saturate(1.3);
+          }
+        }
+        @keyframes neonOrbFloat {
+          0%, 100% {
+            transform: translateY(0px) scale(1);
+            opacity: 0.35;
+          }
+          50% {
+            transform: translateY(-28px) scale(1.15);
+            opacity: 0.75;
+          }
+        }
+        .live-wallpaper-layer {
+          animation: denzjrLiveBg 12s ease-in-out infinite;
+        }
+        .neon-orb-cyan {
+          animation: neonOrbFloat 7s ease-in-out infinite;
+        }
+        .neon-orb-purple {
+          animation: neonOrbFloat 9s ease-in-out infinite reverse;
+        }
+      `}</style>
 
-          <div className="flex items-center gap-3">
-            <Link to="/status" className="bg-[#151b2b]/90 hover:bg-[#1e263d] border border-gray-700/80 px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2">
-              <span>📦</span> Cek Status
-            </Link>
-            <a 
-              href={`https://wa.me/${ADMIN_WHATSAPP}`} 
-              target="_blank" 
-              rel="noreferrer"
-              className="bg-[#151b2b]/90 hover:bg-[#1e263d] border border-gray-700/80 px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 text-emerald-400"
-            >
-              <span>💬</span> Hubungi Admin
-            </a>
+      {/* LAYER 1: GAMBAR LIVE BACKGROUND (bg-denzjr.jpeg) */}
+      <div
+        className="fixed inset-0 bg-cover bg-center pointer-events-none z-0 live-wallpaper-layer"
+        style={{ backgroundImage: "url('/bg-denzjr.jpeg')" }}
+      />
+
+      {/* LAYER 2: PARTIKEL CAHAYA NEON MELAYANG */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="neon-orb-cyan absolute top-24 left-8 w-44 h-44 rounded-full bg-cyan-500/20 blur-3xl" />
+        <div className="neon-orb-purple absolute bottom-32 right-8 w-52 h-52 rounded-full bg-purple-600/25 blur-3xl" />
+        <div className="neon-orb-cyan absolute top-1/2 left-1/3 w-36 h-36 rounded-full bg-blue-500/15 blur-3xl" />
+      </div>
+
+      {/* LAYER 3: VIGNETTE GELAP TENGAH AGAR TEKS TAJAM TERBACA */}
+      <div className="fixed inset-0 bg-gradient-to-b from-[#060913]/65 via-[#070b17]/75 to-[#050811]/85 pointer-events-none z-0" />
+
+      {/* KONTEN UTAMA */}
+      <div className="relative z-10">
+        {/* HEADER */}
+        <header className="sticky top-0 z-30 bg-[#090d1a]/80 backdrop-blur-md border-b border-cyan-500/20 shadow-[0_4px_25px_rgba(6,182,212,0.08)]">
+          <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <img src="/logo.jpeg" alt="DenzJr Store" className="w-11 h-11 rounded-xl object-cover border border-cyan-400/60 shadow-[0_0_15px_rgba(6,182,212,0.35)]" />
+                <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-[#090d1a] ${isOpen ? 'bg-emerald-400' : 'bg-red-500'}`} />
+              </div>
+              <div>
+                <h1 className="text-xl font-extrabold tracking-wide">
+                  DENZJR <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-500">STORE</span>
+                </h1>
+                <p className="text-[11px] tracking-widest text-cyan-300/80 uppercase">Roblox Top Up Center</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <Link to="/status" className="bg-[#131a2e]/85 hover:bg-[#1b2542] border border-cyan-500/30 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 shadow-sm">
+                <span>📦</span> Cek Status
+              </Link>
+              <a 
+                href={`https://wa.me/${ADMIN_WHATSAPP}`} 
+                target="_blank" 
+                rel="noreferrer"
+                className="bg-[#102624]/85 hover:bg-[#153532] border border-emerald-500/40 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 text-emerald-400 shadow-sm"
+              >
+                <span>💬</span> Admin
+              </a>
+            </div>
           </div>
         </header>
 
         <main className="max-w-6xl mx-auto px-4 pt-6">
-          {/* HERO BANNER */}
-          <div className="bg-gradient-to-br from-[#121929]/90 via-[#0f1624]/90 to-[#0b1f29]/90 border border-gray-800 rounded-2xl p-6 md:p-10 mb-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
-            <div className="max-w-lg">
-              <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase mb-2">✨ Top Up Robux Aman & Cepat</p>
+          {/* HERO BANNER DENGAN TOMBOL CARA ORDER & S&K */}
+          <div className="bg-gradient-to-br from-[#0e1528]/85 via-[#11172b]/85 to-[#16122c]/85 backdrop-blur-md border border-cyan-500/30 rounded-2xl p-6 md:p-9 mb-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_0_35px_rgba(6,182,212,0.12)]">
+            <div className="max-w-xl">
+              <div className="inline-flex items-center gap-2 bg-cyan-500/10 border border-cyan-400/30 px-3 py-1 rounded-full mb-3">
+                <span className="text-xs font-bold tracking-wider text-cyan-300 uppercase">✨ Top Up Robux Aman & Cepat</span>
+              </div>
               <h2 className="text-3xl md:text-4xl font-extrabold leading-tight mb-3">
-                Level up your <span className="text-orange-500">Roblox world.</span>
+                Level up your <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-400 to-cyan-400">Roblox world.</span>
               </h2>
               <p className="text-gray-300 text-sm mb-5 leading-relaxed">
-                Isi username, pilih nominal Robux, dan biarkan kami mengurus sisanya. Simple, cepat, dan terpercaya.
+                Isi username, pilih nominal Robux, bayar via QRIS, dan biarkan kami memproses sisanya secara cepat dan transparan.
               </p>
+
+              {/* TOMBOL PANDUAN & S&K */}
+              <div className="flex flex-wrap items-center gap-2.5 mb-5">
+                <button
+                  type="button"
+                  onClick={() => setInfoModal('howto')}
+                  className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition flex items-center gap-1.5"
+                >
+                  <span>📖</span> Cara Order
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInfoModal('terms')}
+                  className="bg-[#161e35]/90 hover:bg-[#1f2a4a] border border-purple-400/40 text-purple-200 font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5"
+                >
+                  <span>📜</span> Syarat & Ketentuan
+                </button>
+              </div>
+
               <div className="flex items-center gap-5 text-xs font-semibold text-gray-300">
                 <span className="flex items-center gap-1.5 text-orange-400">⚡ <span className="text-gray-300">Proses cepat</span></span>
                 <span className="flex items-center gap-1.5 text-emerald-400">🛡️ <span className="text-gray-300">100% aman</span></span>
+                <span className="flex items-center gap-1.5 text-cyan-400">🔍 <span className="text-gray-300">Lacak real-time</span></span>
               </div>
             </div>
 
-            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full border border-cyan-500/30 bg-[#0d1422] flex items-center justify-center relative shadow-[0_0_40px_rgba(6,182,212,0.15)]">
-              <div className="w-24 h-24 rounded-full border border-orange-500/30 flex items-center justify-center">
-                <span className="text-3xl font-black text-white -rotate-12">R$</span>
+            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full border-2 border-cyan-400/40 bg-[#0b1122]/90 flex items-center justify-center relative shadow-[0_0_45px_rgba(6,182,212,0.28)] shrink-0">
+              <div className="w-24 h-24 rounded-full border border-purple-400/50 flex items-center justify-center bg-gradient-to-tr from-cyan-500/10 to-purple-500/10">
+                <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white via-cyan-200 to-orange-400 -rotate-12">R$</span>
               </div>
             </div>
           </div>
 
           {/* 01 DATA AKUN ROBLOX & CATATAN PENTING */}
-          <div className="bg-[#121724]/90 border border-gray-800 rounded-2xl p-6 mb-5">
+          <div className="bg-[#0e1425]/80 backdrop-blur-md border border-cyan-500/20 rounded-2xl p-6 mb-5 shadow-lg">
             <div className="flex items-center gap-3 mb-5">
-              <span className="w-8 h-8 rounded-full bg-orange-600/20 border border-orange-500/40 text-orange-500 font-bold text-xs flex items-center justify-center">
+              <span className="w-8 h-8 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 font-bold text-xs flex items-center justify-center">
                 01
               </span>
               <div>
@@ -388,7 +460,7 @@ export default function StorePage() {
                   value={robloxUsername}
                   onChange={e => setRobloxUsername(e.target.value)}
                   placeholder="Contoh: RobloxPlayer123"
-                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+                  className="w-full bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none transition"
                 />
               </div>
               <div>
@@ -398,7 +470,7 @@ export default function StorePage() {
                   value={displayName}
                   onChange={e => setDisplayName(e.target.value)}
                   placeholder="Contoh: DenzJr"
-                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+                  className="w-full bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none transition"
                 />
               </div>
             </div>
@@ -410,24 +482,24 @@ export default function StorePage() {
                 value={whatsapp}
                 onChange={e => setWhatsapp(e.target.value)}
                 placeholder="Contoh: 081234567890"
-                className="w-full md:w-1/2 bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+                className="w-full md:w-1/2 bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none transition"
               />
             </div>
 
-            <div className="bg-[#231915] border border-orange-500/30 rounded-xl p-4">
-              <p className="text-orange-400 font-bold text-xs mb-1">⚡ Catatan penting</p>
-              <p className="text-gray-300 text-xs">Pastikan username sesuai huruf besar/kecil.</p>
+            <div className="bg-[#1e1726]/90 border border-purple-500/30 rounded-xl p-4">
+              <p className="text-cyan-300 font-bold text-xs mb-1">⚡ Catatan penting</p>
+              <p className="text-gray-300 text-xs">Pastikan username sesuai huruf besar/kecil dan akun tidak dalam mode privat jika diperlukan.</p>
             </div>
           </div>
 
           {/* STATUS STOK & TOKO */}
           {!isOpen ? (
-            <div className="bg-red-950/90 border border-red-500/50 rounded-xl p-4 mb-8 text-center">
-              <span className="text-red-400 font-bold">🔴 Toko Sedang Tutup Sementara — Pemesanan akan dibuka kembali segera.</span>
+            <div className="bg-red-950/85 backdrop-blur-md border border-red-500/50 rounded-xl p-4 mb-8 text-center shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+              <span className="text-red-300 font-bold">🔴 Toko Sedang Tutup Sementara — Pemesanan akan dibuka kembali segera.</span>
             </div>
           ) : (
-            <div className="bg-[#0e2923]/90 border border-emerald-500/40 rounded-xl p-3.5 mb-8 text-center">
-              <span className="text-emerald-400 font-semibold text-sm">
+            <div className="bg-[#0b2526]/85 backdrop-blur-md border border-cyan-400/40 rounded-xl p-3.5 mb-8 text-center shadow-[0_0_20px_rgba(6,182,212,0.15)]">
+              <span className="text-cyan-300 font-semibold text-sm">
                 📦 Stok Robux tersedia: <strong className="text-white">{totalStock !== null && totalStock !== "" ? `${Number(totalStock).toLocaleString('id-ID')} R$` : 'Tersedia'}</strong>
               </span>
             </div>
@@ -437,9 +509,9 @@ export default function StorePage() {
           <div className="flex flex-wrap justify-between items-end mb-5 gap-2">
             <div>
               <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase mb-1">Pilih Sesuai Kebutuhanmu</p>
-              <h2 className="text-3xl font-extrabold">Nominal <span className="text-orange-500">Robux</span></h2>
+              <h2 className="text-3xl font-extrabold">Nominal <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-500">Robux</span></h2>
             </div>
-            <p className="text-xs text-gray-400">Harga transparan • Tanpa biaya tersembunyi</p>
+            <p className="text-xs text-gray-300">Harga transparan • Tanpa biaya tersembunyi</p>
           </div>
 
           {/* GRID NOMINAL ROBUX */}
@@ -447,13 +519,17 @@ export default function StorePage() {
             {packages.map((pkg) => (
               <div 
                 key={pkg.robux} 
-                className={`bg-[#121724]/90 border rounded-2xl p-4 transition flex flex-col justify-between ${pkg.badge ? 'border-orange-500/40' : 'border-gray-800 hover:border-orange-500/50'}`}
+                className={`bg-[#0e1425]/80 backdrop-blur-md border rounded-2xl p-4 transition duration-200 flex flex-col justify-between hover:-translate-y-0.5 ${
+                  pkg.badge 
+                    ? 'border-orange-500/50 shadow-[0_0_20px_rgba(249,115,22,0.12)]' 
+                    : 'border-cyan-500/20 hover:border-cyan-400/60 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)]'
+                }`}
               >
                 <div>
                   <div className="flex justify-between items-center mb-3">
-                    <span className="inline-block bg-[#1d2436] text-gray-300 text-[11px] font-bold px-2 py-0.5 rounded-md">R$</span>
+                    <span className="inline-block bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-[11px] font-bold px-2 py-0.5 rounded-md">R$</span>
                     {pkg.badge && (
-                      <span className="bg-orange-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md tracking-wider uppercase">
+                      <span className="bg-gradient-to-r from-orange-600 to-amber-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md tracking-wider uppercase shadow-sm">
                         {pkg.badge}
                       </span>
                     )}
@@ -461,14 +537,14 @@ export default function StorePage() {
                   <div className="text-lg font-extrabold text-white">
                     {pkg.robux.toLocaleString('id-ID')} <span className="text-xs font-normal text-gray-400">Robux</span>
                   </div>
-                  <div className="text-base font-bold text-gray-200 mt-1 mb-4">
+                  <div className="text-base font-bold text-gray-100 mt-1 mb-4">
                     Rp {pkg.price.toLocaleString('id-ID')}
                   </div>
                 </div>
                 <button
                   disabled={!isOpen || (totalStock !== null && totalStock !== "" && Number(totalStock) < pkg.robux)}
                   onClick={() => addToCart(pkg)}
-                  className="w-full bg-[#1a2234] hover:bg-orange-500 hover:text-white disabled:opacity-40 disabled:hover:bg-[#1a2234] text-gray-200 font-semibold text-xs py-2.5 rounded-xl transition"
+                  className="w-full bg-[#16203a]/90 hover:bg-gradient-to-r hover:from-orange-500 hover:to-amber-500 hover:text-white disabled:opacity-40 disabled:hover:bg-[#16203a] text-cyan-100 border border-cyan-500/20 hover:border-transparent font-semibold text-xs py-2.5 rounded-xl transition"
                 >
                   + Keranjang &gt;
                 </button>
@@ -481,7 +557,7 @@ export default function StorePage() {
             <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase mb-1">Kata Mereka</p>
             <h2 className="text-3xl font-extrabold mb-5">Ulasan <span className="text-orange-500">Pembeli</span></h2>
 
-            <form onSubmit={handleSendReview} className="bg-[#121724]/90 border border-gray-800 rounded-2xl p-6 mb-6">
+            <form onSubmit={handleSendReview} className="bg-[#0e1425]/80 backdrop-blur-md border border-cyan-500/20 rounded-2xl p-6 mb-6">
               <h3 className="font-bold text-lg mb-3">Beri ulasan</h3>
               <div className="flex gap-2 mb-4">
                 {[1, 2, 3, 4, 5].map((star) => (
@@ -502,14 +578,14 @@ export default function StorePage() {
                   value={reviewName}
                   onChange={e => setReviewName(e.target.value)}
                   placeholder="Nama kamu (opsional)"
-                  className="bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+                  className="bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none"
                 />
                 <input
                   type="text"
                   value={reviewOrderId}
                   onChange={e => setReviewOrderId(e.target.value)}
                   placeholder="No. Order (opsional)"
-                  className="bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+                  className="bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none"
                 />
               </div>
 
@@ -519,13 +595,13 @@ export default function StorePage() {
                 value={reviewComment}
                 onChange={e => setReviewComment(e.target.value)}
                 placeholder="Ceritakan pengalaman top up kamu..."
-                className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white mb-4 focus:border-orange-500 outline-none"
+                className="w-full bg-[#080c17]/90 border border-gray-700/80 rounded-xl p-3 text-sm text-white mb-4 focus:border-cyan-400 outline-none"
               />
 
               <button
                 type="submit"
                 disabled={sendingReview}
-                className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition"
+                className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold py-3 rounded-xl transition shadow-md"
               >
                 {sendingReview ? 'Mengirim Ulasan...' : 'Kirim Ulasan'}
               </button>
@@ -534,14 +610,14 @@ export default function StorePage() {
             {reviews.length > 0 && (
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">
                     Menampilkan {showAllReviews ? reviews.length : Math.min(4, reviews.length)} dari {reviews.length} ulasan
                   </p>
                 </div>
 
                 <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${showAllReviews ? 'max-h-[420px] overflow-y-auto pr-1' : ''}`}>
                   {(showAllReviews ? reviews : reviews.slice(0, 4)).map((rev, idx) => (
-                    <div key={rev.id || rev._id || idx} className="bg-[#121724]/90 border border-gray-800 rounded-xl p-4">
+                    <div key={rev.id || rev._id || idx} className="bg-[#0e1425]/80 backdrop-blur-md border border-cyan-500/20 rounded-xl p-4">
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-bold text-sm text-white">{rev.name}</span>
                         <span className="text-amber-400 text-sm">{'★'.repeat(rev.rating || 5)}</span>
@@ -556,7 +632,7 @@ export default function StorePage() {
                     <button
                       type="button"
                       onClick={() => setShowAllReviews(!showAllReviews)}
-                      className="bg-[#151b2b] hover:bg-[#1e263d] border border-gray-700/80 text-cyan-400 font-bold text-xs px-5 py-2.5 rounded-xl transition"
+                      className="bg-[#131b30]/90 hover:bg-[#1b2744] border border-cyan-500/30 text-cyan-300 font-bold text-xs px-5 py-2.5 rounded-xl transition"
                     >
                       {showAllReviews
                         ? '▲ Sembunyikan Sebagian Ulasan'
@@ -568,7 +644,7 @@ export default function StorePage() {
             )}
           </section>
 
-          <footer className="border-t border-gray-800 pt-6 flex flex-wrap justify-between text-xs text-gray-500">
+          <footer className="border-t border-cyan-500/20 pt-6 flex flex-wrap justify-between text-xs text-gray-400">
             <span>© 2026 DenzJr Store</span>
             <span>Top up mudah, main lebih seru.</span>
           </footer>
@@ -576,21 +652,21 @@ export default function StorePage() {
       </div>
 
       {/* FLOATING CART BAR */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#0d121d]/95 border-t border-gray-800 shadow-[0_-10px_30px_rgba(0,0,0,0.6)] z-40">
+      <div className="fixed bottom-0 left-0 right-0 bg-[#090d1a]/90 backdrop-blur-md border-t border-cyan-500/30 shadow-[0_-10px_30px_rgba(0,0,0,0.7)] z-40">
         <div className="max-w-6xl mx-auto px-4 py-3.5 flex justify-between items-center">
           <div>
             <p className="text-xs text-gray-400">Keranjang kamu</p>
             {cart.length === 0 ? (
-              <p className="text-sm font-bold text-orange-500">Masih kosong</p>
+              <p className="text-sm font-bold text-orange-400">Masih kosong</p>
             ) : (
               <p className="text-sm font-bold text-white">
-                {totalRobux.toLocaleString('id-ID')} Robux • <span className="text-orange-400">Rp {totalPrice.toLocaleString('id-ID')}</span>
+                <span className="text-cyan-400">{totalRobux.toLocaleString('id-ID')} R$</span> • <span className="text-orange-400">Rp {totalPrice.toLocaleString('id-ID')}</span>
               </p>
             )}
           </div>
           <button
             onClick={() => setIsCartOpen(true)}
-            className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-lg"
+            className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-[0_0_20px_rgba(249,115,22,0.35)]"
           >
             <span>🛒 Buka Keranjang</span>
             <span className="bg-black/30 px-2 py-0.5 rounded-full text-xs">{cart.length}</span>
@@ -598,10 +674,55 @@ export default function StorePage() {
         </div>
       </div>
 
+      {/* MODAL CARA ORDER & SYARAT KETENTUAN */}
+      {infoModal && (
+        <div
+          onClick={() => setInfoModal(null)}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0e1425] border border-cyan-500/40 rounded-2xl max-w-md w-full p-6 shadow-[0_0_40px_rgba(6,182,212,0.2)]"
+          >
+            <div className="flex justify-between items-center border-b border-gray-800 pb-3 mb-4">
+              <h3 className="text-lg font-extrabold text-cyan-300">
+                {infoModal === 'howto' ? '📖 Cara Order Robux' : '📜 Syarat & Ketentuan'}
+              </h3>
+              <button onClick={() => setInfoModal(null)} className="text-gray-400 hover:text-white text-xl font-bold">✕</button>
+            </div>
+
+            {infoModal === 'howto' ? (
+              <ol className="space-y-2.5 text-sm text-gray-300 list-decimal list-inside leading-relaxed">
+                <li>Isi <strong className="text-white">Username Roblox</strong> dan nomor WhatsApp aktif pada kolom Data Akun.</li>
+                <li>Pilih paket <strong className="text-cyan-300">Nominal Robux</strong> yang diinginkan lalu klik <strong className="text-orange-400">+ Keranjang</strong>.</li>
+                <li>Buka keranjang, cek total Robux & pembayaran, lalu scan <strong className="text-white">QRIS DenzJr Store</strong>.</li>
+                <li>Cantumkan <strong className="text-cyan-300">No. Order</strong> di catatan transfer (opsional) dan upload bukti transfer.</li>
+                <li>Klik <strong className="text-emerald-400">Kirim Order & Bukti TF ke WhatsApp</strong> dan pantau progresnya di menu <strong className="text-white">Cek Status</strong>.</li>
+              </ol>
+            ) : (
+              <ul className="space-y-2.5 text-sm text-gray-300 list-disc list-inside leading-relaxed">
+                <li>Pastikan <strong className="text-white">Username Roblox</strong> sudah benar (kesalahan penulisan username di luar tanggung jawab admin).</li>
+                <li>Pesanan diproses sesuai antrean setelah pembayaran QRIS terverifikasi.</li>
+                <li>Wajib melampirkan bukti transfer asli dan jelas saat checkout.</li>
+                <li>Dana yang sudah masuk tidak dapat di-refund apabila pesanan sudah diproses.</li>
+              </ul>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setInfoModal(null)}
+              className="mt-5 w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2.5 rounded-xl text-sm transition"
+            >
+              Mengerti
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* MODAL KERANJANG & CHECKOUT QRIS */}
       {isCartOpen && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#121724] border border-gray-800 rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto p-5 relative">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#0e1425] border border-cyan-500/30 rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto p-5 relative shadow-[0_0_40px_rgba(6,182,212,0.18)]">
             <div className="flex justify-between items-center border-b border-gray-800 pb-3 mb-4">
               <h3 className="text-lg font-extrabold">Keranjang & Pembayaran</h3>
               <button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-white text-xl font-bold">✕</button>
@@ -613,7 +734,7 @@ export default function StorePage() {
               <>
                 <div className="space-y-2 mb-4">
                   {cart.map((item) => (
-                    <div key={item.cartId} className="bg-[#192032] border border-gray-800 rounded-xl p-3 flex justify-between items-center">
+                    <div key={item.cartId} className="bg-[#151e36] border border-cyan-500/20 rounded-xl p-3 flex justify-between items-center">
                       <div>
                         <p className="font-bold text-sm text-orange-400">{item.robux.toLocaleString('id-ID')} Robux</p>
                         <p className="text-xs text-gray-300">Rp {item.price.toLocaleString('id-ID')}</p>
@@ -636,7 +757,7 @@ export default function StorePage() {
                 </div>
 
                 {/* NO. ORDER LANGSUNG MUNCUL SEBELUM UPLOAD BUKTI TF */}
-                <div className="bg-[#151e33] border border-blue-500/30 rounded-xl p-3 text-xs text-gray-300 mb-3 flex items-center justify-between gap-2">
+                <div className="bg-[#131d36] border border-cyan-500/30 rounded-xl p-3 text-xs text-gray-300 mb-3 flex items-center justify-between gap-2">
                   <div>
                     <span className="text-gray-400 block text-[11px]">No. Order kamu (simpan / cantumkan di catatan TF):</span>
                     <span className="text-cyan-400 font-extrabold text-sm tracking-wide">{previewOrderNumber}</span>
@@ -644,7 +765,7 @@ export default function StorePage() {
                   <button
                     type="button"
                     onClick={handleCopyOrderNumber}
-                    className="bg-blue-600/30 hover:bg-blue-600/50 border border-blue-400/40 text-cyan-300 font-bold px-3 py-1.5 rounded-lg text-[11px] transition shrink-0"
+                    className="bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-400/40 text-cyan-300 font-bold px-3 py-1.5 rounded-lg text-[11px] transition shrink-0"
                   >
                     {copiedOrder ? '✓ Tersalin' : 'Salin'}
                   </button>
@@ -653,19 +774,19 @@ export default function StorePage() {
                 <button
                   type="button"
                   onClick={() => setShowQris(!showQris)}
-                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl mb-3 transition text-sm"
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-2.5 rounded-xl mb-3 transition text-sm"
                 >
                   {showQris ? 'Sembunyikan QRIS' : 'Tampilkan QRIS'}
                 </button>
 
                 {showQris && (
-                  <div className="bg-[#0b0f19] border border-gray-800 rounded-xl p-4 mb-4 text-center">
+                  <div className="bg-[#080c17] border border-cyan-500/20 rounded-xl p-4 mb-4 text-center">
                     <p className="text-cyan-400 font-bold text-sm mb-3">Scan QRIS DenzJr Store</p>
                     <img src="/qris.jpeg" alt="QRIS DenzJr Store" className="w-56 mx-auto rounded-lg bg-white p-1.5 mb-3" />
                     <a
                       href="/qris.jpeg"
                       download="QRIS-DenzJr-Store.jpeg"
-                      className="block w-full bg-[#1a2234] hover:bg-[#242f47] text-gray-200 text-xs font-bold py-2.5 rounded-lg transition"
+                      className="block w-full bg-[#16203a] hover:bg-[#1f2d52] text-gray-200 text-xs font-bold py-2.5 rounded-lg transition"
                     >
                       ⬇ Download QRIS
                     </a>
@@ -679,7 +800,7 @@ export default function StorePage() {
                     value={robloxUsername}
                     onChange={e => setRobloxUsername(e.target.value)}
                     placeholder="Username Roblox *"
-                    className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+                    className="w-full bg-[#080c17] border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none"
                   />
                   <div className="grid grid-cols-2 gap-2">
                     <input
@@ -687,7 +808,7 @@ export default function StorePage() {
                       value={displayName}
                       onChange={e => setDisplayName(e.target.value)}
                       placeholder="Display Name (opsional)"
-                      className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+                      className="w-full bg-[#080c17] border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none"
                     />
                     <input
                       type="text"
@@ -695,11 +816,11 @@ export default function StorePage() {
                       value={whatsapp}
                       onChange={e => setWhatsapp(e.target.value)}
                       placeholder="No. WhatsApp (08xx)"
-                      className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-sm text-white focus:border-orange-500 outline-none"
+                      className="w-full bg-[#080c17] border border-gray-700/80 rounded-xl p-3 text-sm text-white focus:border-cyan-400 outline-none"
                     />
                   </div>
 
-                  <label className="block border border-dashed border-gray-700 hover:border-orange-500 rounded-xl p-3 text-center cursor-pointer transition">
+                  <label className="block border border-dashed border-cyan-500/40 hover:border-cyan-400 rounded-xl p-3 text-center cursor-pointer transition bg-[#080c17]/60">
                     <span className="text-xs text-gray-300">
                       {paymentProof ? `✅ ${paymentProof.name}` : '☁️ Pilih bukti transfer (JPG, PNG, WEBP)'}
                     </span>
