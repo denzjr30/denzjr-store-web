@@ -657,22 +657,23 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* 5. Daftar Pesanan Masuk + Kolom Pencarian */}
-        <section className="space-y-4">
-          <div className="flex flex-wrap justify-between items-center gap-3">
-            <div className="flex flex-wrap gap-2">
-              {['Semua', 'Menunggu konfirmasi', 'Menunggu pembayaran', 'Pembayaran diterima', 'Selesai'].map(st => (
-                <button
-                  key={st}
-                  onClick={() => setStatusFilter(st)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${statusFilter === st ? 'bg-orange-600 text-white' : 'bg-[#121724] border border-gray-800 text-gray-400 hover:text-white'}`}
-                >
-                  {st}
-                </button>
-              ))}
+        {/* 5. Daftar Pesanan Masuk (Dalam Kotak Panel & Header Pembatas) */}
+        <section className="bg-[#121724] border border-gray-800 rounded-2xl p-6 space-y-5">
+          <div className="flex flex-wrap justify-between items-end gap-3 border-b border-gray-800 pb-4">
+            <div>
+              <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">Antrean Transaksi</p>
+              <h2 className="text-xl font-extrabold">
+                Daftar Pesanan Masuk{' '}
+                <span className="text-xs font-normal text-gray-400">
+                  ({filteredOrders.length} pesanan)
+                </span>
+              </h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Kelola konfirmasi transfer, salin username Roblox, ubah status, dan hubungi pembeli.
+              </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
               {/* Kolom Pencarian No. Order / Username / No. HP */}
               <div className="relative flex-1 sm:w-64">
                 <input
@@ -680,7 +681,7 @@ export default function AdminDashboard() {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="🔍 Cari No Order / Username / WA..."
-                  className="w-full bg-[#121724] border border-gray-800 rounded-xl pl-3 pr-8 py-2 text-xs text-white placeholder-gray-500 focus:border-cyan-400 outline-none"
+                  className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl pl-3 pr-8 py-2 text-xs text-white placeholder-gray-500 focus:border-cyan-400 outline-none"
                 />
                 {searchQuery && (
                   <button
@@ -697,7 +698,7 @@ export default function AdminDashboard() {
               <select
                 value={roundFilter}
                 onChange={e => setRoundFilter(e.target.value)}
-                className="bg-[#121724] border border-gray-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-bold outline-none"
+                className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-bold outline-none"
               >
                 <option value="Semua">Semua Putaran</option>
                 {availableRounds.map(rNum => (
@@ -708,7 +709,7 @@ export default function AdminDashboard() {
               <select
                 value={sortOrder}
                 onChange={e => setSortOrder(e.target.value)}
-                className="bg-[#121724] border border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-300 outline-none"
+                className="bg-[#0b0f19] border border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-300 outline-none"
               >
                 <option value="newest">Terbaru dulu</option>
                 <option value="oldest">Terlama dulu</option>
@@ -716,154 +717,168 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          <div className="flex flex-wrap gap-2">
+            {['Semua', 'Menunggu konfirmasi', 'Menunggu pembayaran', 'Pembayaran diterima', 'Selesai'].map(st => (
+              <button
+                key={st}
+                onClick={() => setStatusFilter(st)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${statusFilter === st ? 'bg-orange-600 text-white' : 'bg-[#0b0f19] border border-gray-800 text-gray-400 hover:text-white'}`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+
           {filteredOrders.length === 0 ? (
-            <div className="bg-[#121724] border border-gray-800 rounded-2xl p-8 text-center text-gray-400 text-sm">
+            <div className="bg-[#0b0f19] border border-gray-800 rounded-2xl p-8 text-center text-gray-400 text-sm">
               {searchQuery ? `Tidak ada pesanan yang cocok dengan "${searchQuery}".` : 'Belum ada pesanan pada kategori ini.'}
             </div>
           ) : (
-            filteredOrders.map((ord) => {
-              const orderCode = ord.order_number || ord.tracking_code || ord.id || ord._id;
-              const uName = ord.username || ord.roblox_username || '-';
-              const dName = ord.display_name || ord.buyer_name || '-';
-              const rawPhone = ord.buyer_phone !== undefined && ord.buyer_phone !== null ? String(ord.buyer_phone).trim() : '';
-              const bPhone = rawPhone && !rawPhone.startsWith('0') && !rawPhone.startsWith('62') ? `0${rawPhone}` : rawPhone;
-              const orderTotal = Number(ord.total ?? ord.total_price ?? 0);
-              const totalRobuxOrder = Array.isArray(ord.items) && ord.items.length > 0
-                ? ord.items.reduce((sum, it) => sum + Number(it.robux || 0) * Number(it.qty || 1), 0)
-                : Number(ord.total_robux || ord.robux_amount || 0);
-              const proofSrc = ord.proof_url || ord.payment_proof_url || '';
-              const orderRound = ord.round || currentRound;
+            <div className="space-y-4 max-h-[680px] overflow-y-auto pr-1">
+              {filteredOrders.map((ord) => {
+                const orderCode = ord.order_number || ord.tracking_code || ord.id || ord._id;
+                const uName = ord.username || ord.roblox_username || '-';
+                const dName = ord.display_name || ord.buyer_name || '-';
+                const rawPhone = ord.buyer_phone !== undefined && ord.buyer_phone !== null ? String(ord.buyer_phone).trim() : '';
+                const bPhone = rawPhone && !rawPhone.startsWith('0') && !rawPhone.startsWith('62') ? `0${rawPhone}` : rawPhone;
+                const orderTotal = Number(ord.total ?? ord.total_price ?? 0);
+                const totalRobuxOrder = Array.isArray(ord.items) && ord.items.length > 0
+                  ? ord.items.reduce((sum, it) => sum + Number(it.robux || 0) * Number(it.qty || 1), 0)
+                  : Number(ord.total_robux || ord.robux_amount || 0);
+                const proofSrc = ord.proof_url || ord.payment_proof_url || '';
+                const orderRound = ord.round || currentRound;
 
-              const itemsList = Array.isArray(ord.items) && ord.items.length > 0
-                ? ord.items.map(it => `${Number(it.robux || 0).toLocaleString('id-ID')} R$ • Rp ${Number(it.price || 0).toLocaleString('id-ID')}`)
-                : [`${ord.robux_amount || 0} R$ • Rp ${orderTotal.toLocaleString('id-ID')}`];
+                const itemsList = Array.isArray(ord.items) && ord.items.length > 0
+                  ? ord.items.map(it => `${Number(it.robux || 0).toLocaleString('id-ID')} R$ • Rp ${Number(it.price || 0).toLocaleString('id-ID')}`)
+                  : [`${ord.robux_amount || 0} R$ • Rp ${orderTotal.toLocaleString('id-ID')}`];
 
-              const statusHistory = Array.isArray(ord.status_history) && ord.status_history.length > 0
-                ? ord.status_history
-                : (Array.isArray(ord.history) && ord.history.length > 0
-                  ? ord.history
-                  : (ord.created_at ? [{ status: ord.status, timestamp: ord.created_at }] : []));
+                const statusHistory = Array.isArray(ord.status_history) && ord.status_history.length > 0
+                  ? ord.status_history
+                  : (Array.isArray(ord.history) && ord.history.length > 0
+                    ? ord.history
+                    : (ord.created_at ? [{ status: ord.status, timestamp: ord.created_at }] : []));
 
-              const cleanPhone = String(bPhone).replace(/^0/, '62').replace(/[^0-9]/g, '');
-              const waUpdateMsg = encodeURIComponent(
-                `Halo *${dName !== '-' ? dName : uName}*, update pesanan DenzJr Store kamu:\n` +
-                `• No. Order: *${orderCode}*\n` +
-                `• Username Roblox: *${uName}*\n` +
-                `• Total Robux: *${totalRobuxOrder.toLocaleString('id-ID')} R$*\n` +
-                `• Status Terbaru: *${ord.status}*\n\nTerima kasih sudah order!`
-              );
+                const cleanPhone = String(bPhone).replace(/^0/, '62').replace(/[^0-9]/g, '');
+                const waUpdateMsg = encodeURIComponent(
+                  `Halo *${dName !== '-' ? dName : uName}*, update pesanan DenzJr Store kamu:\n` +
+                  `• No. Order: *${orderCode}*\n` +
+                  `• Username Roblox: *${uName}*\n` +
+                  `• Total Robux: *${totalRobuxOrder.toLocaleString('id-ID')} R$*\n` +
+                  `• Status Terbaru: *${ord.status}*\n\nTerima kasih sudah order!`
+                );
 
-              return (
-                <div key={orderCode} className="bg-[#121724] border border-gray-800 rounded-2xl p-5 space-y-4">
-                  <div className="flex flex-wrap justify-between items-start gap-3">
-                    <div>
+                return (
+                  <div key={orderCode} className="bg-[#0b0f19] border border-gray-800 rounded-2xl p-5 space-y-4">
+                    <div className="flex flex-wrap justify-between items-start gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-extrabold text-orange-500">{orderCode}</h3>
+                          <span className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold px-2 py-0.5 rounded-md">
+                            Putaran {orderRound}
+                          </span>
+                        </div>
+
+                        {/* Username Roblox + Tombol Salin 1-Klik */}
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <p className="text-xs text-gray-300">
+                            <span className="font-bold text-white">{uName}</span> • {dName} ({bPhone || '-'})
+                          </p>
+                          {uName !== '-' && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyUsername(orderCode, uName)}
+                              className="bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-2 py-0.5 rounded-md transition"
+                              title="Salin username Roblox"
+                            >
+                              {copiedUserOrder === orderCode ? '✓ Tersalin' : '📋 Salin User'}
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap gap-2 items-center">
+                          {itemsList.map((label, idx) => (
+                            <span key={idx} className="bg-[#161e31] text-xs px-2.5 py-1 rounded-lg text-gray-300">
+                              {label}
+                            </span>
+                          ))}
+                          {proofSrc && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewProof({ src: proofSrc, orderCode, uName })}
+                              className="text-xs text-cyan-400 underline hover:text-cyan-300"
+                            >
+                              Lihat Bukti TF ↗
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-extrabold text-orange-500">{orderCode}</h3>
-                        <span className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold px-2 py-0.5 rounded-md">
-                          Putaran {orderRound}
+                        <select
+                          value={ord.status}
+                          onChange={e => handleStatusChange(orderCode, e.target.value)}
+                          className="bg-[#121724] border border-gray-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-orange-500"
+                        >
+                          <option value="Menunggu konfirmasi">Menunggu konfirmasi</option>
+                          <option value="Menunggu pembayaran">Menunggu pembayaran</option>
+                          <option value="Pembayaran diterima">Pembayaran diterima</option>
+                          <option value="Selesai">Selesai</option>
+                        </select>
+
+                        <button
+                          onClick={() => handleDeleteOrder(orderCode)}
+                          className="bg-red-950/60 hover:bg-red-900 border border-red-500/40 text-red-400 p-2 rounded-xl"
+                          title="Hapus Pesanan"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Ringkasan Total Robux & Total Bayar */}
+                    <div className="flex flex-wrap justify-between items-center gap-3 border-y border-gray-800 py-3">
+                      <div>
+                        <span className="text-xs text-gray-400 block">Total Robux</span>
+                        <span className="text-xl font-extrabold text-cyan-400">
+                          {totalRobuxOrder.toLocaleString('id-ID')} R$
                         </span>
                       </div>
-
-                      {/* Username Roblox + Tombol Salin 1-Klik */}
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <p className="text-xs text-gray-300">
-                          <span className="font-bold text-white">{uName}</span> • {dName} ({bPhone || '-'})
-                        </p>
-                        {uName !== '-' && (
-                          <button
-                            type="button"
-                            onClick={() => handleCopyUsername(orderCode, uName)}
-                            className="bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-2 py-0.5 rounded-md transition"
-                            title="Salin username Roblox"
-                          >
-                            {copiedUserOrder === orderCode ? '✓ Tersalin' : '📋 Salin User'}
-                          </button>
-                        )}
+                      <div className="text-right">
+                        <span className="text-xs text-gray-400 block">Total Bayar</span>
+                        <span className="text-xl font-extrabold text-orange-500">
+                          Rp {orderTotal.toLocaleString('id-ID')}
+                        </span>
                       </div>
+                    </div>
 
-                      <div className="mt-2 flex flex-wrap gap-2 items-center">
-                        {itemsList.map((label, idx) => (
-                          <span key={idx} className="bg-[#1a2234] text-xs px-2.5 py-1 rounded-lg text-gray-300">
-                            {label}
-                          </span>
+                    {statusHistory.length > 0 && (
+                      <div className="space-y-1.5">
+                        {statusHistory.map((h, idx) => (
+                          <div key={idx} className="flex justify-between items-center text-xs">
+                            <span className="flex items-center gap-2 text-gray-200">
+                              <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+                              {h.status}
+                            </span>
+                            <span className="text-gray-500">{formatHistoryDate(h.timestamp || h.time || h.created_at)}</span>
+                          </div>
                         ))}
-                        {proofSrc && (
-                          <button
-                            type="button"
-                            onClick={() => setPreviewProof({ src: proofSrc, orderCode, uName })}
-                            className="text-xs text-cyan-400 underline hover:text-cyan-300"
-                          >
-                            Lihat Bukti TF ↗
-                          </button>
-                        )}
                       </div>
-                    </div>
+                    )}
 
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={ord.status}
-                        onChange={e => handleStatusChange(orderCode, e.target.value)}
-                        className="bg-[#0b0f19] border border-gray-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-orange-500"
+                    {cleanPhone && (
+                      <a
+                        href={`https://wa.me/${cleanPhone}?text=${waUpdateMsg}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-block bg-[#0e2923] hover:bg-[#143a31] border border-emerald-500/40 text-emerald-400 text-xs font-bold px-4 py-2.5 rounded-xl transition"
                       >
-                        <option value="Menunggu konfirmasi">Menunggu konfirmasi</option>
-                        <option value="Menunggu pembayaran">Menunggu pembayaran</option>
-                        <option value="Pembayaran diterima">Pembayaran diterima</option>
-                        <option value="Selesai">Selesai</option>
-                      </select>
-
-                      <button
-                        onClick={() => handleDeleteOrder(orderCode)}
-                        className="bg-red-950/60 hover:bg-red-900 border border-red-500/40 text-red-400 p-2 rounded-xl"
-                        title="Hapus Pesanan"
-                      >
-                        🗑️
-                      </button>
-                    </div>
+                        Kirim Update ke Pembeli ↗
+                      </a>
+                    )}
                   </div>
-
-                  {/* Ringkasan Total Robux & Total Bayar */}
-                  <div className="flex flex-wrap justify-between items-center gap-3 border-y border-gray-800 py-3">
-                    <div>
-                      <span className="text-xs text-gray-400 block">Total Robux</span>
-                      <span className="text-xl font-extrabold text-cyan-400">
-                        {totalRobuxOrder.toLocaleString('id-ID')} R$
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs text-gray-400 block">Total Bayar</span>
-                      <span className="text-xl font-extrabold text-orange-500">
-                        Rp {orderTotal.toLocaleString('id-ID')}
-                      </span>
-                    </div>
-                  </div>
-
-                  {statusHistory.length > 0 && (
-                    <div className="space-y-1.5">
-                      {statusHistory.map((h, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-xs">
-                          <span className="flex items-center gap-2 text-gray-200">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
-                            {h.status}
-                          </span>
-                          <span className="text-gray-500">{formatHistoryDate(h.timestamp || h.time || h.created_at)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {cleanPhone && (
-                    <a
-                      href={`https://wa.me/${cleanPhone}?text=${waUpdateMsg}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-block bg-[#0e2923] hover:bg-[#143a31] border border-emerald-500/40 text-emerald-400 text-xs font-bold px-4 py-2.5 rounded-xl transition"
-                    >
-                      Kirim Update ke Pembeli ↗
-                    </a>
-                  )}
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </section>
 
