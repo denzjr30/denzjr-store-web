@@ -26,7 +26,6 @@ const DEFAULT_PACKAGES = [
   { robux: 5000, price: 750000, badge: 'SULTAN' },
 ];
 
-// Generator No. Order unik & konsisten dengan format backend DJS-YYYYMMDD-XXXX
 const generateOrderNumber = () => {
   const now = new Date();
   const y = now.getFullYear();
@@ -44,21 +43,16 @@ export default function StorePage() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [showQris, setShowQris] = useState(true);
 
-  // Modal Info (Cara Order & S&K)
-  const [infoModal, setInfoModal] = useState(null); // 'howto' | 'terms' | null
-
-  // No. Order aktif yang langsung muncul sebelum upload bukti transfer
+  const [infoModal, setInfoModal] = useState(null);
   const [previewOrderNumber, setPreviewOrderNumber] = useState('');
   const [copiedOrder, setCopiedOrder] = useState(false);
 
-  // Data Akun Roblox (Bagian 01 & Checkout)
   const [robloxUsername, setRobloxUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [paymentProof, setPaymentProof] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Ulasan
   const [reviews, setReviews] = useState([]);
   const [rating, setRating] = useState(5);
   const [reviewName, setReviewName] = useState('');
@@ -90,10 +84,20 @@ export default function StorePage() {
         }
 
         if (data.prices && typeof data.prices === 'object' && Object.keys(data.prices).length > 0) {
-          const updated = DEFAULT_PACKAGES.map(pkg => ({
-            ...pkg,
-            price: data.prices[pkg.robux] ? Number(data.prices[pkg.robux]) : pkg.price
-          }));
+          const promoMap = data.promo_prices || {};
+          const updated = DEFAULT_PACKAGES.map(pkg => {
+            const normalPrice = data.prices[pkg.robux] ? Number(data.prices[pkg.robux]) : pkg.price;
+            const rawPromo = promoMap[pkg.robux] ? Number(promoMap[pkg.robux]) : 0;
+            const hasPromo = rawPromo > 0 && rawPromo < normalPrice;
+
+            return {
+              ...pkg,
+              price: hasPromo ? rawPromo : normalPrice,
+              originalPrice: hasPromo ? normalPrice : null,
+              discountPercent: hasPromo ? Math.round(((normalPrice - rawPromo) / normalPrice) * 100) : 0,
+              isPromo: hasPromo
+            };
+          });
           setPackages(updated);
         }
       }
@@ -107,7 +111,6 @@ export default function StorePage() {
     }
   };
 
-  // Auto-sync status Buka/Tutup Toko, Stok, & Harga tanpa refresh halaman
   useEffect(() => {
     fetchStoreData();
 
@@ -147,7 +150,6 @@ export default function StorePage() {
     };
   }, []);
 
-  // Buat No. Order otomatis saat ada item di keranjang dan belum memiliki nomor
   useEffect(() => {
     if (cart.length > 0 && !previewOrderNumber) {
       setPreviewOrderNumber(generateOrderNumber());
@@ -246,7 +248,7 @@ export default function StorePage() {
       const proofDriveLink = data.proof_url || '-';
 
       const detailItemsText = cart
-        .map(item => `• ${item.robux.toLocaleString('id-ID')} Robux - Rp ${item.price.toLocaleString('id-ID')}`)
+        .map(item => `• ${item.robux.toLocaleString('id-ID')} Robux - Rp ${item.price.toLocaleString('id-ID')}${item.isPromo ? ' (PROMO)' : ''}`)
         .join('\n');
 
       const waMessage = 
@@ -357,7 +359,7 @@ export default function StorePage() {
         <div className="neon-orb-cyan absolute top-1/2 left-1/3 w-36 h-36 rounded-full bg-blue-500/15 blur-3xl" />
       </div>
 
-      {/* LAYER 3: VIGNETTE GELAP TENGAH AGAR TEKS TAJAM TERBACA */}
+      {/* LAYER 3: VIGNETTE GELAP TENGAH */}
       <div className="fixed inset-0 bg-gradient-to-b from-[#060913]/65 via-[#070b17]/75 to-[#050811]/85 pointer-events-none z-0" />
 
       {/* KONTEN UTAMA */}
@@ -395,7 +397,7 @@ export default function StorePage() {
         </header>
 
         <main className="max-w-6xl mx-auto px-4 pt-6">
-          {/* HERO BANNER DENGAN TOMBOL CARA ORDER & S&K */}
+          {/* HERO BANNER */}
           <div className="bg-gradient-to-br from-[#0e1528]/85 via-[#11172b]/85 to-[#16122c]/85 backdrop-blur-md border border-cyan-500/30 rounded-2xl p-6 md:p-9 mb-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_0_35px_rgba(6,182,212,0.12)]">
             <div className="max-w-xl">
               <div className="inline-flex items-center gap-2 bg-cyan-500/10 border border-cyan-400/30 px-3 py-1 rounded-full mb-3">
@@ -408,7 +410,6 @@ export default function StorePage() {
                 Isi username, pilih nominal Robux, bayar via QRIS, dan biarkan kami memproses sisanya secara cepat dan transparan.
               </p>
 
-              {/* TOMBOL PANDUAN & S&K */}
               <div className="flex flex-wrap items-center gap-2.5 mb-5">
                 <button
                   type="button"
@@ -514,37 +515,66 @@ export default function StorePage() {
             <p className="text-xs text-gray-300">Harga transparan • Tanpa biaya tersembunyi</p>
           </div>
 
-          {/* GRID NOMINAL ROBUX */}
+          {/* GRID NOMINAL ROBUX (DENGAN TAMPILAN PROMO OTOMATIS) */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-14">
             {packages.map((pkg) => (
               <div 
                 key={pkg.robux} 
-                className={`bg-[#0e1425]/80 backdrop-blur-md border rounded-2xl p-4 transition duration-200 flex flex-col justify-between hover:-translate-y-0.5 ${
-                  pkg.badge 
-                    ? 'border-orange-500/50 shadow-[0_0_20px_rgba(249,115,22,0.12)]' 
-                    : 'border-cyan-500/20 hover:border-cyan-400/60 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)]'
+                className={`bg-[#0e1425]/85 backdrop-blur-md border rounded-2xl p-4 transition duration-200 flex flex-col justify-between hover:-translate-y-0.5 ${
+                  pkg.isPromo
+                    ? 'border-pink-500/70 shadow-[0_0_24px_rgba(236,72,153,0.2)]'
+                    : pkg.badge 
+                      ? 'border-orange-500/50 shadow-[0_0_20px_rgba(249,115,22,0.12)]' 
+                      : 'border-cyan-500/20 hover:border-cyan-400/60 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)]'
                 }`}
               >
                 <div>
-                  <div className="flex justify-between items-center mb-3">
+                  <div className="flex justify-between items-center mb-3 gap-1">
                     <span className="inline-block bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-[11px] font-bold px-2 py-0.5 rounded-md">R$</span>
-                    {pkg.badge && (
+                    {pkg.isPromo ? (
+                      <span className="bg-gradient-to-r from-pink-600 to-rose-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md tracking-wider uppercase shadow-sm">
+                        PROMO
+                      </span>
+                    ) : pkg.badge ? (
                       <span className="bg-gradient-to-r from-orange-600 to-amber-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md tracking-wider uppercase shadow-sm">
                         {pkg.badge}
                       </span>
-                    )}
+                    ) : null}
                   </div>
+
                   <div className="text-lg font-extrabold text-white">
                     {pkg.robux.toLocaleString('id-ID')} <span className="text-xs font-normal text-gray-400">Robux</span>
                   </div>
-                  <div className="text-base font-bold text-gray-100 mt-1 mb-4">
-                    Rp {pkg.price.toLocaleString('id-ID')}
-                  </div>
+
+                  {pkg.isPromo && pkg.originalPrice ? (
+                    <div className="mt-1 mb-4">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-gray-400 line-through">
+                          Rp {pkg.originalPrice.toLocaleString('id-ID')}
+                        </span>
+                        <span className="bg-pink-600 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded">
+                          -{pkg.discountPercent}%
+                        </span>
+                      </div>
+                      <div className="text-base font-extrabold text-white mt-0.5">
+                        Rp {pkg.price.toLocaleString('id-ID')}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-base font-bold text-gray-100 mt-1 mb-4">
+                      Rp {pkg.price.toLocaleString('id-ID')}
+                    </div>
+                  )}
                 </div>
+
                 <button
                   disabled={!isOpen || (totalStock !== null && totalStock !== "" && Number(totalStock) < pkg.robux)}
                   onClick={() => addToCart(pkg)}
-                  className="w-full bg-[#16203a]/90 hover:bg-gradient-to-r hover:from-orange-500 hover:to-amber-500 hover:text-white disabled:opacity-40 disabled:hover:bg-[#16203a] text-cyan-100 border border-cyan-500/20 hover:border-transparent font-semibold text-xs py-2.5 rounded-xl transition"
+                  className={`w-full font-semibold text-xs py-2.5 rounded-xl transition disabled:opacity-40 ${
+                    pkg.isPromo
+                      ? 'bg-pink-600/25 hover:bg-gradient-to-r hover:from-pink-600 hover:to-rose-600 text-pink-200 hover:text-white border border-pink-500/40'
+                      : 'bg-[#16203a]/90 hover:bg-gradient-to-r hover:from-orange-500 hover:to-amber-500 hover:text-white disabled:hover:bg-[#16203a] text-cyan-100 border border-cyan-500/20 hover:border-transparent'
+                  }`}
                 >
                   + Keranjang &gt;
                 </button>
@@ -736,8 +766,20 @@ export default function StorePage() {
                   {cart.map((item) => (
                     <div key={item.cartId} className="bg-[#151e36] border border-cyan-500/20 rounded-xl p-3 flex justify-between items-center">
                       <div>
-                        <p className="font-bold text-sm text-orange-400">{item.robux.toLocaleString('id-ID')} Robux</p>
-                        <p className="text-xs text-gray-300">Rp {item.price.toLocaleString('id-ID')}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-sm text-orange-400">{item.robux.toLocaleString('id-ID')} Robux</p>
+                          {item.isPromo && (
+                            <span className="bg-pink-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded">
+                              PROMO -{item.discountPercent}%
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-gray-200 font-semibold">Rp {item.price.toLocaleString('id-ID')}</span>
+                          {item.isPromo && item.originalPrice && (
+                            <span className="text-gray-500 line-through">Rp {item.originalPrice.toLocaleString('id-ID')}</span>
+                          )}
+                        </div>
                       </div>
                       <button onClick={() => removeFromCart(item.cartId)} className="text-red-400 hover:text-red-300 text-sm px-2">🗑️</button>
                     </div>
