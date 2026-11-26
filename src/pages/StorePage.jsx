@@ -64,19 +64,6 @@ export default function StorePage() {
   const [sendingReview, setSendingReview] = useState(false);
   const [showAllReviews, setShowAllReviews] = useState(false);
 
-  useEffect(() => {
-    fetchStoreData();
-  }, []);
-
-  // Buat No. Order otomatis saat ada item di keranjang dan belum memiliki nomor
-  useEffect(() => {
-    if (cart.length > 0 && !previewOrderNumber) {
-      setPreviewOrderNumber(generateOrderNumber());
-    } else if (cart.length === 0) {
-      setPreviewOrderNumber('');
-    }
-  }, [cart.length, previewOrderNumber]);
-
   const fetchStoreData = async () => {
     try {
       const [shopRes, reviewsRes] = await Promise.allSettled([
@@ -116,6 +103,58 @@ export default function StorePage() {
       console.error("Gagal memuat pengaturan toko", err);
     }
   };
+
+  // Auto-sync status Buka/Tutup Toko, Stok, & Harga tanpa refresh halaman
+  useEffect(() => {
+    fetchStoreData();
+
+    // 1. Cek otomatis setiap 3 detik HANYA saat tab sedang aktif dibuka
+    const syncInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchStoreData();
+      }
+    }, 3000);
+
+    // 2. Sinkronisasi instan (0 detik) jika diubah dari AdminDashboard di browser yang sama
+    let channel = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      channel = new BroadcastChannel('denzjr_store_sync');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'SHOP_STATUS_CHANGED') {
+          setIsOpen(Boolean(event.data.isOpen));
+          fetchStoreData();
+        } else if (event.data?.type === 'STORE_DATA_UPDATED') {
+          fetchStoreData();
+        }
+      };
+    }
+
+    // 3. Langsung sinkronkan saat pembeli kembali membuka tab/layar browser
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetchStoreData();
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(syncInterval);
+      if (channel) channel.close();
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
+  }, []);
+
+  // Buat No. Order otomatis saat ada item di keranjang dan belum memiliki nomor
+  useEffect(() => {
+    if (cart.length > 0 && !previewOrderNumber) {
+      setPreviewOrderNumber(generateOrderNumber());
+    } else if (cart.length === 0) {
+      setPreviewOrderNumber('');
+    }
+  }, [cart.length, previewOrderNumber]);
 
   const addToCart = (pkg) => {
     if (!isOpen) return alert("Maaf, toko sedang tutup sementara.");
@@ -222,6 +261,7 @@ export default function StorePage() {
         `🛒 DETAIL ITEM\n` +
         `------------------------------------\n` +
         `${detailItemsText}\n\n` +
+        `💎 TOTAL ROBUX : ${totalRobux.toLocaleString('id-ID')} R$\n` +
         `💰 TOTAL PEMBAYARAN : Rp ${totalPrice.toLocaleString('id-ID')}\n` +
         `🧾 Bukti TF : ${proofDriveLink}\n` +
         `------------------------------------\n\n` +
@@ -276,7 +316,7 @@ export default function StorePage() {
       className="min-h-screen text-white font-sans bg-cover bg-center bg-fixed pb-28 relative"
       style={{ backgroundImage: "url('/background.jpeg')" }}
     >
-      <div className="min-h-screen bg-[#0b0f19]/90">
+      <div className="min-h-screen bg-[#0b0f19]/75 backdrop-blur-[1px]">
         {/* HEADER */}
         <header className="max-w-6xl mx-auto px-4 py-5 flex flex-wrap justify-between items-center gap-4 border-b border-gray-800/80">
           <div className="flex items-center gap-3">
@@ -290,14 +330,14 @@ export default function StorePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link to="/status" className="bg-[#151b2b] hover:bg-[#1e263d] border border-gray-700/80 px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2">
+            <Link to="/status" className="bg-[#151b2b]/90 hover:bg-[#1e263d] border border-gray-700/80 px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2">
               <span>📦</span> Cek Status
             </Link>
             <a 
               href={`https://wa.me/${ADMIN_WHATSAPP}`} 
               target="_blank" 
               rel="noreferrer"
-              className="bg-[#151b2b] hover:bg-[#1e263d] border border-gray-700/80 px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 text-emerald-400"
+              className="bg-[#151b2b]/90 hover:bg-[#1e263d] border border-gray-700/80 px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 text-emerald-400"
             >
               <span>💬</span> Hubungi Admin
             </a>
@@ -306,7 +346,7 @@ export default function StorePage() {
 
         <main className="max-w-6xl mx-auto px-4 pt-6">
           {/* HERO BANNER */}
-          <div className="bg-gradient-to-br from-[#121929]/95 via-[#0f1624]/95 to-[#0b1f29]/95 border border-gray-800 rounded-2xl p-6 md:p-10 mb-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+          <div className="bg-gradient-to-br from-[#121929]/90 via-[#0f1624]/90 to-[#0b1f29]/90 border border-gray-800 rounded-2xl p-6 md:p-10 mb-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
             <div className="max-w-lg">
               <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase mb-2">✨ Top Up Robux Aman & Cepat</p>
               <h2 className="text-3xl md:text-4xl font-extrabold leading-tight mb-3">
@@ -329,7 +369,7 @@ export default function StorePage() {
           </div>
 
           {/* 01 DATA AKUN ROBLOX & CATATAN PENTING */}
-          <div className="bg-[#121724]/95 border border-gray-800 rounded-2xl p-6 mb-5">
+          <div className="bg-[#121724]/90 border border-gray-800 rounded-2xl p-6 mb-5">
             <div className="flex items-center gap-3 mb-5">
               <span className="w-8 h-8 rounded-full bg-orange-600/20 border border-orange-500/40 text-orange-500 font-bold text-xs flex items-center justify-center">
                 01
@@ -407,7 +447,7 @@ export default function StorePage() {
             {packages.map((pkg) => (
               <div 
                 key={pkg.robux} 
-                className={`bg-[#121724]/95 border rounded-2xl p-4 transition flex flex-col justify-between ${pkg.badge ? 'border-orange-500/40' : 'border-gray-800 hover:border-orange-500/50'}`}
+                className={`bg-[#121724]/90 border rounded-2xl p-4 transition flex flex-col justify-between ${pkg.badge ? 'border-orange-500/40' : 'border-gray-800 hover:border-orange-500/50'}`}
               >
                 <div>
                   <div className="flex justify-between items-center mb-3">
@@ -441,7 +481,7 @@ export default function StorePage() {
             <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase mb-1">Kata Mereka</p>
             <h2 className="text-3xl font-extrabold mb-5">Ulasan <span className="text-orange-500">Pembeli</span></h2>
 
-            <form onSubmit={handleSendReview} className="bg-[#121724]/95 border border-gray-800 rounded-2xl p-6 mb-6">
+            <form onSubmit={handleSendReview} className="bg-[#121724]/90 border border-gray-800 rounded-2xl p-6 mb-6">
               <h3 className="font-bold text-lg mb-3">Beri ulasan</h3>
               <div className="flex gap-2 mb-4">
                 {[1, 2, 3, 4, 5].map((star) => (
@@ -492,40 +532,40 @@ export default function StorePage() {
             </form>
 
             {reviews.length > 0 && (
-           <div className="space-y-4">
-             <div className="flex justify-between items-center">
-               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                 Menampilkan {showAllReviews ? reviews.length : Math.min(4, reviews.length)} dari {reviews.length} ulasan
-               </p>
-             </div>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Menampilkan {showAllReviews ? reviews.length : Math.min(4, reviews.length)} dari {reviews.length} ulasan
+                  </p>
+                </div>
 
-             <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${showAllReviews ? 'max-h-[420px] overflow-y-auto pr-1' : ''}`}>
-               {(showAllReviews ? reviews : reviews.slice(0, 4)).map((rev, idx) => (
-                 <div key={rev.id || rev._id || idx} className="bg-[#121724]/95 border border-gray-800 rounded-xl p-4">
-                   <div className="flex justify-between items-center mb-1">
-                     <span className="font-bold text-sm text-white">{rev.name}</span>
-                     <span className="text-amber-400 text-sm">{'★'.repeat(rev.rating || 5)}</span>
-                   </div>
-                   <p className="text-gray-300 text-sm">{rev.comment}</p>
-                 </div>
-               ))}
-             </div>
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${showAllReviews ? 'max-h-[420px] overflow-y-auto pr-1' : ''}`}>
+                  {(showAllReviews ? reviews : reviews.slice(0, 4)).map((rev, idx) => (
+                    <div key={rev.id || rev._id || idx} className="bg-[#121724]/90 border border-gray-800 rounded-xl p-4">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-bold text-sm text-white">{rev.name}</span>
+                        <span className="text-amber-400 text-sm">{'★'.repeat(rev.rating || 5)}</span>
+                      </div>
+                      <p className="text-gray-300 text-sm">{rev.comment}</p>
+                    </div>
+                  ))}
+                </div>
 
-             {reviews.length > 4 && (
-               <div className="text-center pt-1">
-                 <button
-                   type="button"
-                   onClick={() => setShowAllReviews(!showAllReviews)}
-                   className="bg-[#151b2b] hover:bg-[#1e263d] border border-gray-700/80 text-cyan-400 font-bold text-xs px-5 py-2.5 rounded-xl transition"
-                 >
-                   {showAllReviews
-                     ? '▲ Sembunyikan Sebagian Ulasan'
-                     : `▼ Lihat Semua Ulasan (${reviews.length})`}
-                 </button>
-               </div>
-             )}
-           </div>
-         )}
+                {reviews.length > 4 && (
+                  <div className="text-center pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllReviews(!showAllReviews)}
+                      className="bg-[#151b2b] hover:bg-[#1e263d] border border-gray-700/80 text-cyan-400 font-bold text-xs px-5 py-2.5 rounded-xl transition"
+                    >
+                      {showAllReviews
+                        ? '▲ Sembunyikan Sebagian Ulasan'
+                        : `▼ Lihat Semua Ulasan (${reviews.length})`}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           <footer className="border-t border-gray-800 pt-6 flex flex-wrap justify-between text-xs text-gray-500">
@@ -583,9 +623,16 @@ export default function StorePage() {
                   ))}
                 </div>
 
-                <div className="flex justify-between items-center py-3 border-y border-gray-800 mb-4">
-                  <span className="font-bold text-gray-300">Total pembayaran</span>
-                  <span className="text-2xl font-extrabold text-orange-500">Rp {totalPrice.toLocaleString('id-ID')}</span>
+                {/* RINGKASAN TOTAL ROBUX & TOTAL PEMBAYARAN */}
+                <div className="py-3 border-y border-gray-800 mb-4 space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-400">Total Robux:</span>
+                    <span className="font-extrabold text-cyan-400">{totalRobux.toLocaleString('id-ID')} R$</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-gray-300">Total pembayaran</span>
+                    <span className="text-2xl font-extrabold text-orange-500">Rp {totalPrice.toLocaleString('id-ID')}</span>
+                  </div>
                 </div>
 
                 {/* NO. ORDER LANGSUNG MUNCUL SEBELUM UPLOAD BUKTI TF */}
