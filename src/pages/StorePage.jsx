@@ -621,7 +621,7 @@ export default function StorePage() {
             <div className="bg-[#1e1726]/90 border border-purple-500/30 rounded-xl px-3 py-2 flex items-center gap-2">
               <span className="text-cyan-300 text-xs shrink-0">⚡</span>
               <p className="text-gray-300 text-[11px] sm:text-xs truncate">
-                <strong className="text-cyan-300">Penting:</strong> Cek huruf besar/kecil username &amp; pastikan sudah sesuai.
+                <strong className="text-cyan-300">Penting:</strong> CEK HURUF BESAR/KECIL USERNAME. 
               </p>
             </div>
           </div>
