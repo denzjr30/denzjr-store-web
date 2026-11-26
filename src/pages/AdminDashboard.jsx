@@ -37,6 +37,7 @@ export default function AdminDashboard() {
   const [savingStockCapital, setSavingStockCapital] = useState(false);
   const [savingPrices, setSavingPrices] = useState(false);
   const [previewProof, setPreviewProof] = useState(null);
+  const [copiedUserOrder, setCopiedUserOrder] = useState('');
 
   const [showNewRoundModal, setShowNewRoundModal] = useState(false);
   const [nextRoundCapital, setNextRoundCapital] = useState('615000');
@@ -46,6 +47,7 @@ export default function AdminDashboard() {
   const [statsScope, setStatsScope] = useState('active');
   const [statusFilter, setStatusFilter] = useState('Semua');
   const [roundFilter, setRoundFilter] = useState('Semua');
+  const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState('newest');
 
   useEffect(() => {
@@ -105,8 +107,12 @@ export default function AdminDashboard() {
       if (shopRes.status === 'fulfilled' && shopRes.value) {
         const s = shopRes.value;
         const rawStock = s.total_stock;
-        setStock(rawStock !== null && rawStock !== undefined && rawStock !== '' ? String(rawStock) : '');
-        setIsOpen(s.closed !== undefined ? !s.closed : (s.is_open !== undefined ? s.is_open : true));
+        const parsedStock = rawStock !== null && rawStock !== undefined && rawStock !== '' ? Number(rawStock) : null;
+        setStock(parsedStock !== null ? String(parsedStock) : '');
+
+        const serverOpen = s.closed !== undefined ? !s.closed : (s.is_open !== undefined ? s.is_open : true);
+        setIsOpen(parsedStock !== null && parsedStock <= 0 ? false : serverOpen);
+
         if (s.current_round) setCurrentRound(Number(s.current_round));
         if (s.round_capital !== undefined) setRoundCapital(String(s.round_capital));
 
@@ -126,6 +132,10 @@ export default function AdminDashboard() {
 
   const handleToggleShopStatus = async () => {
     const nextOpenState = !isOpen;
+    if (nextOpenState && stock !== '' && Number(stock) <= 0) {
+      alert('Stok Robux masih 0 R$. Isi stok terlebih dahulu sebelum membuka toko!');
+      return;
+    }
     try {
       const res = await gasStoreApi.adminUpdateConfig(token, {
         closed: !nextOpenState
@@ -143,15 +153,23 @@ export default function AdminDashboard() {
     setSavingStockCapital(true);
     try {
       const stockValue = stock === '' ? null : Number(stock);
+      const autoClosed = stockValue !== null && stockValue <= 0 ? true : !isOpen;
+
       const res = await gasStoreApi.adminUpdateConfig(token, {
-        closed: !isOpen,
+        closed: autoClosed,
         totalStock: stockValue,
         roundCapital: Number(roundCapital || 0)
       });
       if (res.error) throw new Error(res.error);
 
-      notifyStoreSync({ type: 'STORE_DATA_UPDATED' });
-      alert('Perubahan stok & modal putaran berhasil disimpan ke Google Sheets!');
+      if (stockValue !== null && stockValue <= 0) {
+        setIsOpen(false);
+        notifyStoreSync({ type: 'SHOP_STATUS_CHANGED', isOpen: false });
+        alert('Stok diatur ke 0 R$ — Toko otomatis ditutup sampai stok diisi kembali!');
+      } else {
+        notifyStoreSync({ type: 'STORE_DATA_UPDATED' });
+        alert('Perubahan stok & modal putaran berhasil disimpan ke Google Sheets!');
+      }
       fetchAllAdminData();
     } catch (err) {
       alert(`Gagal menyimpan stok & modal: ${err.message}`);
@@ -249,6 +267,13 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleCopyUsername = (orderCode, usernameText) => {
+    if (!usernameText || usernameText === '-') return;
+    navigator.clipboard.writeText(usernameText);
+    setCopiedUserOrder(orderCode);
+    setTimeout(() => setCopiedUserOrder(''), 2000);
+  };
+
   const formatHistoryDate = (isoStr) => {
     if (!isoStr) return '';
     try {
@@ -291,9 +316,18 @@ export default function AdminDashboard() {
     currentRound
   ])).sort((a, b) => b - a);
 
+  const q = searchQuery.trim().toLowerCase();
   const filteredOrders = orders
     .filter(o => statusFilter === 'Semua' || o.status === statusFilter)
     .filter(o => roundFilter === 'Semua' || String(o.round || currentRound) === String(roundFilter))
+    .filter(o => {
+      if (!q) return true;
+      const code = String(o.order_number || o.tracking_code || o.id || '').toLowerCase();
+      const user = String(o.username || o.roblox_username || '').toLowerCase();
+      const disp = String(o.display_name || o.buyer_name || '').toLowerCase();
+      const phone = String(o.buyer_phone || '').toLowerCase();
+      return code.includes(q) || user.includes(q) || disp.includes(q) || phone.includes(q);
+    })
     .sort((a, b) => sortOrder === 'newest' ? 0 : -1);
 
   if (!token) {
@@ -522,7 +556,7 @@ export default function AdminDashboard() {
                 placeholder="Contoh: 5000"
                 className="w-full bg-[#0b0f19] border border-gray-800 rounded-xl p-3 text-white font-bold focus:border-orange-500 outline-none"
               />
-              <p className="text-xs text-gray-500 mt-1.5">Berkurang otomatis saat pesanan selesai.</p>
+              <p className="text-xs text-gray-500 mt-1.5">Berkurang otomatis saat pesanan selesai (auto-tutup saat 0 R$).</p>
             </div>
 
             <div>
@@ -623,7 +657,7 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* 5. Daftar Pesanan Masuk */}
+        {/* 5. Daftar Pesanan Masuk + Kolom Pencarian */}
         <section className="space-y-4">
           <div className="flex flex-wrap justify-between items-center gap-3">
             <div className="flex flex-wrap gap-2">
@@ -638,7 +672,28 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              {/* Kolom Pencarian No. Order / Username / No. HP */}
+              <div className="relative flex-1 sm:w-64">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="🔍 Cari No Order / Username / WA..."
+                  className="w-full bg-[#121724] border border-gray-800 rounded-xl pl-3 pr-8 py-2 text-xs text-white placeholder-gray-500 focus:border-cyan-400 outline-none"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-bold"
+                    title="Hapus pencarian"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
               <select
                 value={roundFilter}
                 onChange={e => setRoundFilter(e.target.value)}
@@ -663,7 +718,7 @@ export default function AdminDashboard() {
 
           {filteredOrders.length === 0 ? (
             <div className="bg-[#121724] border border-gray-800 rounded-2xl p-8 text-center text-gray-400 text-sm">
-              Belum ada pesanan pada kategori ini.
+              {searchQuery ? `Tidak ada pesanan yang cocok dengan "${searchQuery}".` : 'Belum ada pesanan pada kategori ini.'}
             </div>
           ) : (
             filteredOrders.map((ord) => {
@@ -673,6 +728,9 @@ export default function AdminDashboard() {
               const rawPhone = ord.buyer_phone !== undefined && ord.buyer_phone !== null ? String(ord.buyer_phone).trim() : '';
               const bPhone = rawPhone && !rawPhone.startsWith('0') && !rawPhone.startsWith('62') ? `0${rawPhone}` : rawPhone;
               const orderTotal = Number(ord.total ?? ord.total_price ?? 0);
+              const totalRobuxOrder = Array.isArray(ord.items) && ord.items.length > 0
+                ? ord.items.reduce((sum, it) => sum + Number(it.robux || 0) * Number(it.qty || 1), 0)
+                : Number(ord.total_robux || ord.robux_amount || 0);
               const proofSrc = ord.proof_url || ord.payment_proof_url || '';
               const orderRound = ord.round || currentRound;
 
@@ -691,6 +749,7 @@ export default function AdminDashboard() {
                 `Halo *${dName !== '-' ? dName : uName}*, update pesanan DenzJr Store kamu:\n` +
                 `• No. Order: *${orderCode}*\n` +
                 `• Username Roblox: *${uName}*\n` +
+                `• Total Robux: *${totalRobuxOrder.toLocaleString('id-ID')} R$*\n` +
                 `• Status Terbaru: *${ord.status}*\n\nTerima kasih sudah order!`
               );
 
@@ -704,7 +763,24 @@ export default function AdminDashboard() {
                           Putaran {orderRound}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-400">{uName} • {dName} ({bPhone || '-'})</p>
+
+                      {/* Username Roblox + Tombol Salin 1-Klik */}
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <p className="text-xs text-gray-300">
+                          <span className="font-bold text-white">{uName}</span> • {dName} ({bPhone || '-'})
+                        </p>
+                        {uName !== '-' && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyUsername(orderCode, uName)}
+                            className="bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-2 py-0.5 rounded-md transition"
+                            title="Salin username Roblox"
+                          >
+                            {copiedUserOrder === orderCode ? '✓ Tersalin' : '📋 Salin User'}
+                          </button>
+                        )}
+                      </div>
+
                       <div className="mt-2 flex flex-wrap gap-2 items-center">
                         {itemsList.map((label, idx) => (
                           <span key={idx} className="bg-[#1a2234] text-xs px-2.5 py-1 rounded-lg text-gray-300">
@@ -745,9 +821,20 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center border-y border-gray-800 py-3">
-                    <span className="text-xs text-gray-400">Total</span>
-                    <span className="text-xl font-extrabold text-orange-500">Rp {orderTotal.toLocaleString('id-ID')}</span>
+                  {/* Ringkasan Total Robux & Total Bayar */}
+                  <div className="flex flex-wrap justify-between items-center gap-3 border-y border-gray-800 py-3">
+                    <div>
+                      <span className="text-xs text-gray-400 block">Total Robux</span>
+                      <span className="text-xl font-extrabold text-cyan-400">
+                        {totalRobuxOrder.toLocaleString('id-ID')} R$
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs text-gray-400 block">Total Bayar</span>
+                      <span className="text-xl font-extrabold text-orange-500">
+                        Rp {orderTotal.toLocaleString('id-ID')}
+                      </span>
+                    </div>
                   </div>
 
                   {statusHistory.length > 0 && (
