@@ -5,6 +5,21 @@ import { Link } from 'react-router-dom';
 const ADMIN_WHATSAPP = "6281958085966";
 const CHECKOUT_DRAFT_KEY = "denzjr_checkout_draft_v1";
 
+const isManualPageReload = () => {
+  try {
+    const navEntries = performance.getEntriesByType?.('navigation');
+    if (navEntries && navEntries.length > 0) {
+      return navEntries[0].type === 'reload';
+    }
+    if (performance.navigation) {
+      return performance.navigation.type === 1;
+    }
+  } catch (err) {
+    // Abaikan jika API tidak tersedia
+  }
+  return false;
+};
+
 const loadCheckoutDraft = () => {
   try {
     const raw = localStorage.getItem(CHECKOUT_DRAFT_KEY);
@@ -12,16 +27,25 @@ const loadCheckoutDraft = () => {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
 
+    const validCart = Array.isArray(parsed.cart)
+      ? parsed.cart.filter(
+          (item) =>
+            item &&
+            typeof item === 'object' &&
+            Number.isFinite(Number(item.robux)) &&
+            Number.isFinite(Number(item.price))
+        )
+      : [];
+
+    // Jika keranjang masih kosong (baru isi data Roblox saja) dan halaman sengaja di-refresh:
+    // hapus draf agar form kembali bersih/ter-reset.
+    if (validCart.length === 0 && isManualPageReload()) {
+      localStorage.removeItem(CHECKOUT_DRAFT_KEY);
+      return null;
+    }
+
     return {
-      cart: Array.isArray(parsed.cart)
-        ? parsed.cart.filter(
-            (item) =>
-              item &&
-              typeof item === 'object' &&
-              Number.isFinite(Number(item.robux)) &&
-              Number.isFinite(Number(item.price))
-          )
-        : [],
+      cart: validCart,
       robloxUsername: typeof parsed.robloxUsername === 'string' ? parsed.robloxUsername : '',
       displayName: typeof parsed.displayName === 'string' ? parsed.displayName : '',
       whatsapp: typeof parsed.whatsapp === 'string' ? parsed.whatsapp : '',
